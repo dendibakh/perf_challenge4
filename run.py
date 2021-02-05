@@ -42,10 +42,11 @@ if verbose:
   print ("Submissions:")
 
 for submission in os.listdir(os.getcwd()):
-  if not os.path.isfile(os.path.join(os.getcwd(), submission)):
-    submissions.append((submission, os.path.join(os.getcwd(), submission)))
-    if verbose:
-      print ("  " + submission)
+  if not submission == ".git":
+    if not os.path.isfile(os.path.join(os.getcwd(), submission)):
+      submissions.append((submission, os.path.join(os.getcwd(), submission)))
+      if verbose:
+        print ("  " + submission)
 
 if buildOnly or buildAndRun:
   if verbose:
