@@ -5,9 +5,19 @@ import shutil
 import argparse
 
 # python run.py -v [-build] [-run] [-submission=<folder>]
+# 
 # Instructions:
 # The script goes through all the folders in current dir and tries 
 # to build and run each submission.
+# Use this script to track the progress of your experiments.
+# I recommend to create a new folder for each new experiment.
+# When you run the script for all the submissions in the folder,
+# It will generate the score table for each of your experiments.
+# Example:
+# time(s)  submission    timings for 10 consecutive runs (s)                              speedup
+# ([3.56,   'AVX2',       [3.56, 3.56, 3.56, 3.56, 3.56, 3.56, 3.56, 3.56, 3.56, 3.56]], ' + 1.21x')
+# ([4.29,   'baseline',   [4.29, 4.29, 4.29, 4.29, 4.3, 4.3, 4.3, 4.3, 4.3, 4.33]],      ' + 1.0x' )
+# ([4.35,   'align loop', [4.35, 4.35, 4.35, 4.35, 4.35, 4.35, 4.35, 4.35, 4.35, 4.35]], ' + 0.99x')
 
 parser = argparse.ArgumentParser(description='test submissions')
 parser.add_argument("-v", help="verbose", action="store_true", default=False)
