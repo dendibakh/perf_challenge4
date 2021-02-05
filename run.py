@@ -66,7 +66,7 @@ if buildOnly or buildAndRun:
       os.chdir(submissionBuildDir)    
 
       try:
-	subprocess.check_call("cmake ../ -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ > /dev/null", shell=True)
+	subprocess.check_call("cmake ../ > /dev/null", shell=True)
         print("  cmake - OK")
       except:
         print("  cmake - Failed")
