@@ -33,6 +33,7 @@ cleanBuild = args.clean
 runOnly = args.run
 buildAndRun = not runOnly and not buildOnly
 doSubmission = args.submission
+FNULL = open(os.devnull, 'w')
 
 saveCwd = os.getcwd()
 
@@ -67,13 +68,13 @@ if buildOnly or buildAndRun:
       os.chdir(submissionBuildDir)    
 
       try:
-	subprocess.check_call("cmake ../ > /dev/null", shell=True)
+	subprocess.check_call("cmake ../", shell=True, stdout=FNULL, stderr=FNULL)
         print("  cmake - OK")
       except:
         print("  cmake - Failed")
 
       try:
-        subprocess.check_call("make > /dev/null", shell=True)
+        subprocess.check_call("make", shell=True, stdout=FNULL, stderr=FNULL)
         print("  make - OK")
       except:
         print("  make - Failed")
@@ -81,7 +82,7 @@ if buildOnly or buildAndRun:
       inputFileName = str(os.path.join(saveCwd, "221575.pgm"))
       destDir = str(submissionBuildDir)
       try:
-        subprocess.check_call("cp " + inputFileName + " " + destDir, shell=True)
+        subprocess.check_call("cp " + inputFileName + " " + destDir, shell=True, stdout=FNULL, stderr=FNULL)
         print("  copy image - OK")
       except:
         print("  copy image - Failed")
@@ -110,7 +111,7 @@ if runOnly or buildAndRun:
       runCmd = "./canny " + inputFileName + " 0.5 0.7 0.9 2>&1"
       valid = True
       try:
-        subprocess.check_call(runCmd, shell=True)
+        subprocess.check_call(runCmd, shell=True, stdout=FNULL, stderr=FNULL)
       except:
         valid = False
 
@@ -124,7 +125,7 @@ if runOnly or buildAndRun:
 
       valid = True
       try:
-        subprocess.check_call("./validate " + goldenFileName + " " + outputFileName + " 2>&1", shell=True)
+        subprocess.check_call("./validate " + goldenFileName + " " + outputFileName, shell=True, stdout=FNULL, stderr=FNULL)
       except:
         valid = False
      
