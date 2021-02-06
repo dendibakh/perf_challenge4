@@ -1,6 +1,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 
 template <typename T>
 std::vector<T> read_binary_file(const char *fname, size_t num = 0) {
