@@ -917,7 +917,7 @@ int read_pgm_image(char *infilename, unsigned char **image, int *rows,
    ***************************************************************************/
    if(infilename == NULL) fp = stdin;
    else{
-      if((fp = fopen(infilename, "r")) == NULL){
+      if((fp = fopen(infilename, "rb")) == NULL){
          fprintf(stderr, "Error reading the file %s in read_pgm_image().\n",
             infilename);
          return(0);
