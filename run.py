@@ -68,7 +68,7 @@ if buildOnly or buildAndRun:
       os.chdir(submissionBuildDir)    
 
       try:
-	subprocess.check_call("cmake ../", shell=True, stdout=FNULL, stderr=FNULL)
+        subprocess.check_call("cmake ../", shell=True, stdout=FNULL, stderr=FNULL)
         print("  cmake - OK")
       except:
         print("  cmake - Failed")
@@ -136,9 +136,9 @@ if runOnly or buildAndRun:
 
       for x in range(0, 10):
         output = subprocess.check_output("time -p " + runCmd, shell=True) 
-        for row in output.split('\n'):
-          if 'real' in row:
-            real, time = row.split(' ')
+        for row in output.split(b'\n'):
+          if b'real' in row:
+            real, time = row.split(b' ')
             scores.append(float(time))
 
       copyScores = scores    
