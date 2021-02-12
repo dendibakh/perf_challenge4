@@ -10,7 +10,7 @@
 * permission may be granted only by Mike Heath or Prof. Sudeep Sarkar of
 * University of South Florida (sarkar@csee.usf.edu). Acknowledgment as
 * appropriate is respectfully requested.
-* 
+*
 *  Heath, M., Sarkar, S., Sanocki, T., and Bowyer, K. Comparison of edge
 *    detectors: a methodology and initial study, Computer Vision and Image
 *    Understanding 69 (1), 38-54, January 1998.
@@ -33,7 +33,7 @@
 * The user must input three parameters. These are as follows:
 *
 *   sigma = The standard deviation of the gaussian smoothing filter.
-*   tlow  = Specifies the low value to use in hysteresis. This is a 
+*   tlow  = Specifies the low value to use in hysteresis. This is a
 *           fraction (0-1) of the computed high threshold edge strength value.
 *   thigh = Specifies the high value to use in hysteresis. This fraction (0-1)
 *           specifies the percentage point in a histogram of the gradient of
@@ -52,10 +52,15 @@
 *                     defined in radians counterclockwise from the x direction.
 *                     (Mike Heath)
 *******************************************************************************/
+
+// Changes
+// 1. Replace calloc() calls with malloc().
+
 #include <stdio.h>
 #include <stdlib.h>
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <string.h>
 
 #define VERBOSE 0
 #define BOOSTBLURFACTOR 90.0
@@ -227,7 +232,7 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
    * Perform non-maximal suppression.
    ****************************************************************************/
    if(VERBOSE) printf("Doing the non-maximal suppression.\n");
-   if((nms = (unsigned char *) calloc(rows*cols,sizeof(unsigned char)))==NULL){
+   if((nms = (unsigned char *) malloc(rows*cols*sizeof(unsigned char)))==NULL){
       fprintf(stderr, "Error allocating the nms image.\n");
       exit(1);
    }
@@ -238,7 +243,7 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
    * Use hysteresis to mark the edge pixels.
    ****************************************************************************/
    if(VERBOSE) printf("Doing hysteresis thresholding.\n");
-   if((*edge=(unsigned char *)calloc(rows*cols,sizeof(unsigned char))) ==NULL){
+   if((*edge=(unsigned char *)malloc(rows*cols*sizeof(unsigned char))) ==NULL){
       fprintf(stderr, "Error allocating the edge image.\n");
       exit(1);
    }
@@ -281,7 +286,7 @@ void radian_direction(short int *delta_x, short int *delta_y, int rows,
    /****************************************************************************
    * Allocate an image to store the direction of the gradient.
    ****************************************************************************/
-   if((dirim = (float *) calloc(rows*cols, sizeof(float))) == NULL){
+   if((dirim = (float *) malloc(rows*cols*sizeof(float))) == NULL){
       fprintf(stderr, "Error allocating the gradient direction image.\n");
       exit(1);
    }
@@ -342,7 +347,7 @@ void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
    /****************************************************************************
    * Allocate an image to store the magnitude of the gradient.
    ****************************************************************************/
-   if((*magnitude = (short *) calloc(rows*cols, sizeof(short))) == NULL){
+   if((*magnitude = (short *) malloc(rows*cols*sizeof(short))) == NULL){
       fprintf(stderr, "Error allocating the magnitude image.\n");
       exit(1);
    }
@@ -377,11 +382,11 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
    /****************************************************************************
    * Allocate images to store the derivatives.
    ****************************************************************************/
-   if(((*delta_x) = (short *) calloc(rows*cols, sizeof(short))) == NULL){
+   if(((*delta_x) = (short *) malloc(rows*cols*sizeof(short))) == NULL){
       fprintf(stderr, "Error allocating the delta_x image.\n");
       exit(1);
    }
-   if(((*delta_y) = (short *) calloc(rows*cols, sizeof(short))) == NULL){
+   if(((*delta_y) = (short *) malloc(rows*cols*sizeof(short))) == NULL){
       fprintf(stderr, "Error allocating the delta_x image.\n");
       exit(1);
    }
@@ -444,12 +449,11 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    /****************************************************************************
    * Allocate a temporary buffer image and the smoothed image.
    ****************************************************************************/
-   if((tempim = (float *) calloc(rows*cols, sizeof(float))) == NULL){
+   if((tempim = (float *) malloc(rows*cols*sizeof(float))) == NULL){
       fprintf(stderr, "Error allocating the buffer image.\n");
       exit(1);
    }
-   if(((*smoothedim) = (short int *) calloc(rows*cols,
-         sizeof(short int))) == NULL){
+   if(((*smoothedim) = (short int *) malloc(rows*cols*sizeof(short int))) == NULL){
       fprintf(stderr, "Error allocating the smoothed image.\n");
       exit(1);
    }
@@ -509,7 +513,7 @@ void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
    center = (*windowsize) / 2;
 
    if(VERBOSE) printf("      The kernel has %d elements.\n", *windowsize);
-   if((*kernel = (float *) calloc((*windowsize), sizeof(float))) == NULL){
+   if((*kernel = (float *) malloc((*windowsize)*sizeof(float))) == NULL){
       fprintf(stderr, "Error callocing the gaussian kernel array.\n");
       exit(1);
    }
@@ -1013,7 +1017,7 @@ int write_pgm_image(char *outfilename, unsigned char *image, int rows,
 * All comments in the header are discarded in the process of reading the
 * image. Upon failure, this function returns 0, upon sucess it returns 1.
 ******************************************************************************/
-int read_ppm_image(char *infilename, unsigned char **image_red, 
+int read_ppm_image(char *infilename, unsigned char **image_red,
     unsigned char **image_grn, unsigned char **image_blu, int *rows,
     int *cols)
 {
