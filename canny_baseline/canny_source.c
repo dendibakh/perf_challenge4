@@ -57,6 +57,7 @@
 // 1. Replace calloc() calls with malloc().
 // 2. gaussian_smooth(): Loop interchange for Y-direction.
 // 3. apply_hysteresis(): Fusing edge detection and histogram calculation.
+// 4. follow_edges(): Better locality through x, y reordering.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -562,16 +563,13 @@ void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
 void follow_edges(unsigned char *edgemapptr, short *edgemagptr, short lowval,
    int cols)
 {
-   short *tempmagptr;
-   unsigned char *tempmapptr;
    int i;
-   float thethresh;
-   int x[8] = {1,1,0,-1,-1,-1,0,1},
-       y[8] = {0,1,1,1,0,-1,-1,-1};
+   const int x[8] = {-1,  0,  1, -1,  1, -1, 0, 1 },
+             y[8] = {-1, -1, -1,  0,  0,  1, 1, 1 };
 
    for(i=0;i<8;i++){
-      tempmapptr = edgemapptr - y[i]*cols + x[i];
-      tempmagptr = edgemagptr - y[i]*cols + x[i];
+      unsigned char *tempmapptr = edgemapptr - y[i]*cols + x[i];
+      short *tempmagptr = edgemagptr - y[i]*cols + x[i];
 
       if((*tempmapptr == POSSIBLE_EDGE) && (*tempmagptr > lowval)){
          *tempmapptr = (unsigned char) EDGE;
