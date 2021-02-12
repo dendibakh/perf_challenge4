@@ -56,6 +56,7 @@
 // Changes
 // 1. Replace calloc() calls with malloc().
 // 2. gaussian_smooth(): Loop interchange for Y-direction.
+// 3. apply_hysteresis(): Fusing edge detection and histogram calculation.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -594,6 +595,8 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
        i, hist[32768], rr, cc;
    short int maximum_mag, sumpix;
 
+   memset(hist, 0, 32768 * sizeof(*hist));
+
    /****************************************************************************
    * Initialize the edge map to possible edges everywhere the non-maximal
    * suppression suggested there could be an edge except for the border. At
@@ -601,10 +604,20 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
    * follow_edges algorithm more efficient to not worry about tracking an
    * edge off the side of the image.
    ****************************************************************************/
+
+   /****************************************************************************
+   * Compute the histogram of the magnitude image. Then use the histogram to
+   * compute hysteresis thresholds.
+   ****************************************************************************/
    for(r=0,pos=0;r<rows;r++){
       for(c=0;c<cols;c++,pos++){
-	 if(nms[pos] == POSSIBLE_EDGE) edge[pos] = POSSIBLE_EDGE;
-	 else edge[pos] = NOEDGE;
+	      if(nms[pos] == POSSIBLE_EDGE){
+            edge[pos] = POSSIBLE_EDGE;
+            hist[mag[pos]]++;
+         }
+	      else{
+            edge[pos] = NOEDGE;
+         }
       }
    }
 
@@ -616,17 +629,6 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
    for(c=0;c<cols;c++,pos++){
       edge[c] = NOEDGE;
       edge[pos] = NOEDGE;
-   }
-
-   /****************************************************************************
-   * Compute the histogram of the magnitude image. Then use the histogram to
-   * compute hysteresis thresholds.
-   ****************************************************************************/
-   for(r=0;r<32768;r++) hist[r] = 0;
-   for(r=0,pos=0;r<rows;r++){
-      for(c=0;c<cols;c++,pos++){
-	 if(edge[pos] == POSSIBLE_EDGE) hist[mag[pos]]++;
-      }
    }
 
    /****************************************************************************
