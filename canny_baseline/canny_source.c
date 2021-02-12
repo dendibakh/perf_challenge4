@@ -55,6 +55,7 @@
 
 // Changes
 // 1. Replace calloc() calls with malloc().
+// 2. gaussian_smooth(): Loop interchange for Y-direction.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -480,8 +481,8 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    * Blur in the y - direction.
    ****************************************************************************/
    if(VERBOSE) printf("   Bluring the image in the Y-direction.\n");
-   for(c=0;c<cols;c++){
-      for(r=0;r<rows;r++){
+   for(r=0;r<rows;r++){
+      for(c=0;c<cols;c++){
          sum = 0.0;
          dot = 0.0;
          for(rr=(-center);rr<=center;rr++){
@@ -693,7 +694,7 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
 * DATE: 2/15/96
 *******************************************************************************/
 void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
-    unsigned char *result) 
+    unsigned char *result)
 {
     int rowcount, colcount,count;
     short *magrowptr,*magptr;
@@ -702,12 +703,12 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
     short m00,gx,gy;
     float mag1,mag2,xperp,yperp;
     unsigned char *resultrowptr, *resultptr;
-    
+
 
    /****************************************************************************
    * Zero the edges of the result image.
    ****************************************************************************/
-    for(count=0,resultrowptr=result,resultptr=result+ncols*(nrows-1); 
+    for(count=0,resultrowptr=result,resultptr=result+ncols*(nrows-1);
         count<ncols; resultptr++,resultrowptr++,count++){
         *resultrowptr = *resultptr = (unsigned char) 0;
     }
@@ -722,12 +723,12 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
    ****************************************************************************/
    for(rowcount=1,magrowptr=mag+ncols+1,gxrowptr=gradx+ncols+1,
       gyrowptr=grady+ncols+1,resultrowptr=result+ncols+1;
-      rowcount<nrows-2; 
+      rowcount<nrows-2;
       rowcount++,magrowptr+=ncols,gyrowptr+=ncols,gxrowptr+=ncols,
-      resultrowptr+=ncols){   
+      resultrowptr+=ncols){
       for(colcount=1,magptr=magrowptr,gxptr=gxrowptr,gyptr=gyrowptr,
-         resultptr=resultrowptr;colcount<ncols-2; 
-         colcount++,magptr++,gxptr++,gyptr++,resultptr++){   
+         resultptr=resultrowptr;colcount<ncols-2;
+         colcount++,magptr++,gxptr++,gyptr++,resultptr++){
          m00 = *magptr;
          if(m00 == 0){
             *resultptr = (unsigned char) NOEDGE;
@@ -740,14 +741,14 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
          if(gx >= 0){
             if(gy >= 0){
                     if (gx >= gy)
-                    {  
+                    {
                         /* 111 */
                         /* Left point */
                         z1 = *(magptr - 1);
                         z2 = *(magptr - ncols - 1);
 
                         mag1 = (m00 - z1)*xperp + (z2 - z1)*yperp;
-                        
+
                         /* Right point */
                         z1 = *(magptr + 1);
                         z2 = *(magptr + ncols + 1);
@@ -755,7 +756,7 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         mag2 = (m00 - z1)*xperp + (z2 - z1)*yperp;
                     }
                     else
-                    {    
+                    {
                         /* 110 */
                         /* Left point */
                         z1 = *(magptr - ncols);
@@ -767,7 +768,7 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         z1 = *(magptr + ncols);
                         z2 = *(magptr + ncols + 1);
 
-                        mag2 = (z1 - z2)*xperp + (z1 - m00)*yperp; 
+                        mag2 = (z1 - z2)*xperp + (z1 - m00)*yperp;
                     }
                 }
                 else
@@ -780,7 +781,7 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         z2 = *(magptr + ncols - 1);
 
                         mag1 = (m00 - z1)*xperp + (z1 - z2)*yperp;
-            
+
                         /* Right point */
                         z1 = *(magptr + 1);
                         z2 = *(magptr - ncols + 1);
@@ -788,7 +789,7 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         mag2 = (m00 - z1)*xperp + (z1 - z2)*yperp;
                     }
                     else
-                    {    
+                    {
                         /* 100 */
                         /* Left point */
                         z1 = *(magptr + ncols);
@@ -800,7 +801,7 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         z1 = *(magptr - ncols);
                         z2 = *(magptr - ncols + 1);
 
-                        mag2 = (z1 - z2)*xperp  + (m00 - z1)*yperp; 
+                        mag2 = (z1 - z2)*xperp  + (m00 - z1)*yperp;
                     }
                 }
             }
@@ -809,7 +810,7 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                 if ((gy = *gyptr) >= 0)
                 {
                     if (-gx >= gy)
-                    {          
+                    {
                         /* 011 */
                         /* Left point */
                         z1 = *(magptr + 1);
@@ -872,7 +873,7 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         mag2 = (z2 - z1)*xperp + (m00 - z1)*yperp;
                     }
                 }
-            } 
+            }
 
             /* Now determine if the current point is a maximum point */
 
@@ -881,13 +882,13 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                 *resultptr = (unsigned char) NOEDGE;
             }
             else
-            {    
+            {
                 if (mag2 == 0.0)
                     *resultptr = (unsigned char) NOEDGE;
                 else
                     *resultptr = (unsigned char) POSSIBLE_EDGE;
             }
-        } 
+        }
     }
 }
 /*******************************************************************************
