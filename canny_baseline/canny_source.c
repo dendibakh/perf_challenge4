@@ -58,6 +58,7 @@
 // 2. gaussian_smooth(): Loop interchange for Y-direction.
 // 3. apply_hysteresis(): Fusing edge detection and histogram calculation.
 // 4. follow_edges(): Better locality through x, y reordering.
+// 5. non_max_supp(): Remove zeroing of edges
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -700,23 +701,9 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
     short *magrowptr,*magptr;
     short *gxrowptr,*gxptr;
     short *gyrowptr,*gyptr,z1,z2;
-    short m00,gx,gy;
+    short gx,gy;
     float mag1,mag2,xperp,yperp;
     unsigned char *resultrowptr, *resultptr;
-
-
-   /****************************************************************************
-   * Zero the edges of the result image.
-   ****************************************************************************/
-    for(count=0,resultrowptr=result,resultptr=result+ncols*(nrows-1);
-        count<ncols; resultptr++,resultrowptr++,count++){
-        *resultrowptr = *resultptr = (unsigned char) 0;
-    }
-
-    for(count=0,resultptr=result,resultrowptr=result+ncols-1;
-        count<nrows; count++,resultptr+=ncols,resultrowptr+=ncols){
-        *resultptr = *resultrowptr = (unsigned char) 0;
-    }
 
    /****************************************************************************
    * Suppress non-maximum points.
@@ -729,7 +716,7 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
       for(colcount=1,magptr=magrowptr,gxptr=gxrowptr,gyptr=gyrowptr,
          resultptr=resultrowptr;colcount<ncols-2;
          colcount++,magptr++,gxptr++,gyptr++,resultptr++){
-         m00 = *magptr;
+         const short m00 = *magptr;
          if(m00 == 0){
             *resultptr = (unsigned char) NOEDGE;
          }
@@ -877,16 +864,13 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
 
             /* Now determine if the current point is a maximum point */
 
-            if ((mag1 > 0.0) || (mag2 > 0.0))
+            if ((mag1 > 0.0) || (mag2 >= 0.0))
             {
                 *resultptr = (unsigned char) NOEDGE;
             }
             else
             {
-                if (mag2 == 0.0)
-                    *resultptr = (unsigned char) NOEDGE;
-                else
-                    *resultptr = (unsigned char) POSSIBLE_EDGE;
+                *resultptr = (unsigned char) POSSIBLE_EDGE;
             }
         }
     }
