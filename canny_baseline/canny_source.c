@@ -187,7 +187,6 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
              *delta_x,        /* The first devivative image, x-direction. */
              *delta_y,        /* The first derivative image, y-direction. */
              *magnitude;      /* The magnitude of the gadient image.      */
-   int r, c, pos;
    float *dir_radians=NULL;   /* Gradient direction image.                */
 
    /****************************************************************************
@@ -589,9 +588,8 @@ void follow_edges(unsigned char *edgemapptr, short *edgemagptr, short lowval,
 void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
 	float tlow, float thigh, unsigned char *edge)
 {
-   int r, c, pos, numedges, lowcount, highcount, lowthreshold, highthreshold,
-       i, hist[32768], rr, cc;
-   short int maximum_mag, sumpix;
+   int r, c, pos, numedges, highcount, lowthreshold, highthreshold, hist[32768];
+   short int maximum_mag;
 
    memset(hist, 0, 32768 * sizeof(*hist));
 
@@ -696,7 +694,7 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
 void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
     unsigned char *result)
 {
-    int rowcount, colcount,count;
+    int rowcount, colcount;
     short *magrowptr,*magptr;
     short *gxrowptr,*gxptr;
     short *gyrowptr,*gyptr,z1,z2;
