@@ -60,6 +60,8 @@
 // 4. follow_edges(): Better locality through x, y reordering.
 // 5. non_max_supp(): Remove zeroing of edges
 // 6. non_max_supp(): Avoid unnecessary work if m00 is 0.
+// 7. gaussian_smooth(): Avoiding branch in innermost loop.
+
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -435,12 +437,11 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
 void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
         short int **smoothedim)
 {
-   int r, c, rr, cc,     /* Counter variables. */
+   int r, c,             /* Counter variables. */
       windowsize,        /* Dimension of the gaussian kernel. */
       center;            /* Half of the windowsize. */
    float *tempim,        /* Buffer for separable filter gaussian smoothing. */
          *kernel;        /* A one dimensional gaussian kernel. */
-
    /****************************************************************************
    * Create a 1-dimensional gaussian smoothing kernel.
    ****************************************************************************/
@@ -468,11 +469,11 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
       for(c=0;c<cols;c++){
          float dot = 0.0;
          float sum = 0.0;
-         for(cc=(-center);cc<=center;cc++){
-            if(((c+cc) >= 0) && ((c+cc) < cols)){
-               dot += (float)image[r*cols+(c+cc)] * kernel[center+cc];
-               sum += kernel[center+cc];
-            }
+         int first = (c - center) >= 0 ? -center : -c;
+         int last  = (c + center) < cols ? center : cols - c;
+         for(; first<=last; first++){
+            dot += (float)image[r*cols+(c+first)] * kernel[center+first];
+            sum += kernel[center+first];
          }
          tempim[r*cols+c] = dot/sum;
       }
@@ -486,11 +487,11 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
       for(c=0;c<cols;c++){
          float sum = 0.0;
          float dot = 0.0;
-         for(rr=(-center);rr<=center;rr++){
-            if(((r+rr) >= 0) && ((r+rr) < rows)){
-               dot += tempim[(r+rr)*cols+c] * kernel[center+rr];
-               sum += kernel[center+rr];
-            }
+         int first = (r - center) >= 0 ? -center : -r;
+         int last  = (r + center) < rows ? center : rows - r;
+         for(; first<=last; first++){
+            dot += tempim[(r+first)*cols+c] * kernel[center+first];
+            sum += kernel[center+first];
          }
          (*smoothedim)[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5);
       }
@@ -605,14 +606,12 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
    * Compute the histogram of the magnitude image. Then use the histogram to
    * compute hysteresis thresholds.
    ****************************************************************************/
+   memset(edge, NOEDGE, rows * cols * sizeof(*edge));
    for(r=0,pos=0;r<rows;r++){
       for(c=0;c<cols;c++,pos++){
 	      if(nms[pos] == POSSIBLE_EDGE){
             edge[pos] = POSSIBLE_EDGE;
             hist[mag[pos]]++;
-         }
-	      else{
-            edge[pos] = NOEDGE;
          }
       }
    }
