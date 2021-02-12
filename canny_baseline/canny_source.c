@@ -59,6 +59,7 @@
 // 3. apply_hysteresis(): Fusing edge detection and histogram calculation.
 // 4. follow_edges(): Better locality through x, y reordering.
 // 5. non_max_supp(): Remove zeroing of edges
+// 6. non_max_supp(): Avoid unnecessary work if m00 is 0.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -439,9 +440,7 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
       windowsize,        /* Dimension of the gaussian kernel. */
       center;            /* Half of the windowsize. */
    float *tempim,        /* Buffer for separable filter gaussian smoothing. */
-         *kernel,        /* A one dimensional gaussian kernel. */
-         dot,            /* Dot product summing variable. */
-         sum;            /* Sum of the kernel weights variable. */
+         *kernel;        /* A one dimensional gaussian kernel. */
 
    /****************************************************************************
    * Create a 1-dimensional gaussian smoothing kernel.
@@ -468,8 +467,8 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    if(VERBOSE) printf("   Bluring the image in the X-direction.\n");
    for(r=0;r<rows;r++){
       for(c=0;c<cols;c++){
-         dot = 0.0;
-         sum = 0.0;
+         float dot = 0.0;
+         float sum = 0.0;
          for(cc=(-center);cc<=center;cc++){
             if(((c+cc) >= 0) && ((c+cc) < cols)){
                dot += (float)image[r*cols+(c+cc)] * kernel[center+cc];
@@ -486,8 +485,8 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    if(VERBOSE) printf("   Bluring the image in the Y-direction.\n");
    for(r=0;r<rows;r++){
       for(c=0;c<cols;c++){
-         sum = 0.0;
-         dot = 0.0;
+         float sum = 0.0;
+         float dot = 0.0;
          for(rr=(-center);rr<=center;rr++){
             if(((r+rr) >= 0) && ((r+rr) < rows)){
                dot += tempim[(r+rr)*cols+c] * kernel[center+rr];
@@ -723,12 +722,11 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
          else{
             xperp = -(gx = *gxptr)/((float)m00);
             yperp = (gy = *gyptr)/((float)m00);
-         }
 
-         if(gx >= 0){
-            if(gy >= 0){
-                    if (gx >= gy)
-                    {
+            if(gx >= 0){
+               if(gy >= 0){
+                     if (gx >= gy)
+                     {
                         /* 111 */
                         /* Left point */
                         z1 = *(magptr - 1);
@@ -741,9 +739,9 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         z2 = *(magptr + ncols + 1);
 
                         mag2 = (m00 - z1)*xperp + (z2 - z1)*yperp;
-                    }
-                    else
-                    {
+                     }
+                     else
+                     {
                         /* 110 */
                         /* Left point */
                         z1 = *(magptr - ncols);
@@ -756,12 +754,12 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         z2 = *(magptr + ncols + 1);
 
                         mag2 = (z1 - z2)*xperp + (z1 - m00)*yperp;
-                    }
-                }
-                else
-                {
-                    if (gx >= -gy)
-                    {
+                     }
+                  }
+                  else
+                  {
+                     if (gx >= -gy)
+                     {
                         /* 101 */
                         /* Left point */
                         z1 = *(magptr - 1);
@@ -774,9 +772,9 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         z2 = *(magptr - ncols + 1);
 
                         mag2 = (m00 - z1)*xperp + (z1 - z2)*yperp;
-                    }
-                    else
-                    {
+                     }
+                     else
+                     {
                         /* 100 */
                         /* Left point */
                         z1 = *(magptr + ncols);
@@ -789,15 +787,15 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         z2 = *(magptr - ncols + 1);
 
                         mag2 = (z1 - z2)*xperp  + (m00 - z1)*yperp;
-                    }
-                }
-            }
-            else
-            {
-                if ((gy = *gyptr) >= 0)
-                {
-                    if (-gx >= gy)
-                    {
+                     }
+                  }
+               }
+               else
+               {
+                  if ((gy = *gyptr) >= 0)
+                  {
+                     if (-gx >= gy)
+                     {
                         /* 011 */
                         /* Left point */
                         z1 = *(magptr + 1);
@@ -810,9 +808,9 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         z2 = *(magptr + ncols - 1);
 
                         mag2 = (z1 - m00)*xperp + (z2 - z1)*yperp;
-                    }
-                    else
-                    {
+                     }
+                     else
+                     {
                         /* 010 */
                         /* Left point */
                         z1 = *(magptr - ncols);
@@ -825,12 +823,12 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         z2 = *(magptr + ncols - 1);
 
                         mag2 = (z2 - z1)*xperp + (z1 - m00)*yperp;
-                    }
-                }
-                else
-                {
-                    if (-gx > -gy)
-                    {
+                     }
+                  }
+                  else
+                  {
+                     if (-gx > -gy)
+                     {
                         /* 001 */
                         /* Left point */
                         z1 = *(magptr + 1);
@@ -843,9 +841,9 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         z2 = *(magptr - ncols - 1);
 
                         mag2 = (z1 - m00)*xperp + (z1 - z2)*yperp;
-                    }
-                    else
-                    {
+                     }
+                     else
+                     {
                         /* 000 */
                         /* Left point */
                         z1 = *(magptr + ncols);
@@ -858,22 +856,23 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         z2 = *(magptr - ncols - 1);
 
                         mag2 = (z2 - z1)*xperp + (m00 - z1)*yperp;
-                    }
-                }
+                  }
+               }
             }
 
             /* Now determine if the current point is a maximum point */
 
             if ((mag1 > 0.0) || (mag2 >= 0.0))
             {
-                *resultptr = (unsigned char) NOEDGE;
+               *resultptr = (unsigned char) NOEDGE;
             }
             else
             {
-                *resultptr = (unsigned char) POSSIBLE_EDGE;
+               *resultptr = (unsigned char) POSSIBLE_EDGE;
             }
-        }
-    }
+         }
+      }
+   }
 }
 /*******************************************************************************
 * FILE: pgm_io.c
