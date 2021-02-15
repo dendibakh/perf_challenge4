@@ -108,10 +108,13 @@ if runOnly or buildAndRun:
       scores = []
 
       inputFileName = str(os.path.join(submissionBuildDir, "221575.pgm"))
-      runCmd = "./canny " + inputFileName + " 0.5 0.7 0.9 2>&1"
+      if sys.platform != 'win32':      
+        runCmd = "./canny " + inputFileName + " 0.5 0.7 0.9 2>&1"
+      else:
+        runCmd = "canny.exe " + inputFileName + " 0.5 0.7 0.9"
       valid = True
       try:
-        subprocess.check_call(runCmd, shell=True, stdout=FNULL, stderr=FNULL)
+        subprocess.check_call(runCmd, shell=True, stdout=FNULL, stderr=FNULL)   
       except:
         valid = False
 
@@ -119,13 +122,17 @@ if runOnly or buildAndRun:
         print("  run - OK")
       if not valid:
         print("  run - Failed")
-      
+        print("  input file:" + inputFileName)
+     
       outputFileName = str(os.path.join(submissionBuildDir, "221575.pgm_s_0.50_l_0.70_h_0.90.pgm"))
       goldenFileName = str(os.path.join(saveCwd, "221575-out-golden.pgm"))
 
       valid = True
       try:
-        subprocess.check_call("./validate " + goldenFileName + " " + outputFileName, shell=True, stdout=FNULL, stderr=FNULL)
+        if sys.platform != 'win32':            
+          subprocess.check_call("./validate " + goldenFileName + " " + outputFileName, shell=True, stdout=FNULL, stderr=FNULL)
+        else:
+          subprocess.check_call("validate.exe " + goldenFileName + " " + outputFileName, shell=True, stdout=FNULL, stderr=FNULL)          
       except:
         valid = False
      
@@ -134,13 +141,24 @@ if runOnly or buildAndRun:
       if not valid:
         print("  validation - Failed")
 
+      if verbose:
+        print ("Running 10 measurements loop ...")
+        
       for x in range(0, 10):
-        output = subprocess.check_output("time -p " + runCmd, shell=True) 
-        for row in output.split(b'\n'):
-          if b'real' in row:
-            real, time = row.split(b' ')
-            scores.append(float(time))
-
+        if sys.platform != 'win32':
+          output = subprocess.check_output("time -p " + runCmd, shell=True)
+          for row in output.split(b'\n'):
+            if b'real' in row:
+              real, time = row.split(b' ')
+              scores.append(float(time))          
+        else:
+          print("  run - WIN 32")
+          output = subprocess.check_output("powershell -Command \"Measure-Command {" + runCmd + " | Out-Default}\" | findstr TotalSeconds" , shell=True)
+          for row in output.split(b'\n'):
+            if b'TotalSeconds' in row:
+              totalSeconds, colon, time = output.split()
+              scores.append(float(time.decode().replace(',','.')))
+          
       copyScores = scores    
       copyScores.sort()
       minScore = copyScores[0]
