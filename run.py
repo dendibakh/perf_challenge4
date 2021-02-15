@@ -74,15 +74,29 @@ if buildOnly or buildAndRun:
         print("  cmake - Failed")
 
       try:
-        subprocess.check_call("make", shell=True, stdout=FNULL, stderr=FNULL)
+        if sys.platform != 'win32':           
+          subprocess.check_call("make", shell=True, stdout=FNULL, stderr=FNULL)
+        else:
+          subprocess.check_call("cmake --build . --target canny --config Release", shell=True, stdout=FNULL, stderr=FNULL)
+          subprocess.check_call("cmake --build . --target validate --config Release", shell=True, stdout=FNULL, stderr=FNULL)
         print("  make - OK")
       except:
         print("  make - Failed")
+      
+      if sys.platform == 'win32':
+        try:
+          subprocess.check_call("copy .\\Release\\*.exe .", shell=True, stdout=FNULL, stderr=FNULL)
+          print("  copy .exe - OK")
+        except:
+          print("  copy .exe - Failed")
 
       inputFileName = str(os.path.join(saveCwd, "221575.pgm"))
       destDir = str(submissionBuildDir)
       try:
-        subprocess.check_call("cp " + inputFileName + " " + destDir, shell=True, stdout=FNULL, stderr=FNULL)
+        if sys.platform != 'win32':                
+          subprocess.check_call("cp " + inputFileName + " " + destDir, shell=True, stdout=FNULL, stderr=FNULL)
+        else:
+            subprocess.check_call("copy " + inputFileName + " " + destDir, shell=True, stdout=FNULL, stderr=FNULL)
         print("  copy image - OK")
       except:
         print("  copy image - Failed")
@@ -140,6 +154,7 @@ if runOnly or buildAndRun:
         print("  validation - OK")
       if not valid:
         print("  validation - Failed")
+        print("  validation - validate.exe " + goldenFileName + " " + outputFileName)
 
       if verbose:
         print ("Running 10 measurements loop ...")
