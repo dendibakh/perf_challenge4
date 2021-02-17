@@ -975,7 +975,11 @@ int write_pgm_image(char *outfilename, unsigned char *image, int rows,
    ***************************************************************************/
    if(outfilename == NULL) fp = stdout;
    else{
+#if _WIN32
+      if ((fp = fopen(outfilename, "wb")) == NULL) {
+#else
       if((fp = fopen(outfilename, "w")) == NULL){
+#endif
          fprintf(stderr, "Error writing the file %s in write_pgm_image().\n",
             outfilename);
          return(0);
@@ -985,10 +989,23 @@ int write_pgm_image(char *outfilename, unsigned char *image, int rows,
    /***************************************************************************
    * Write the header information to the PGM file.
    ***************************************************************************/
+#if _WIN32
+   fwrite("P5\n", 1, strlen("P5\n"), fp);
+   fprintf(fp, "%d %d", cols, rows);
+   fwrite("\n", 1, strlen("\n"), fp);
+   if (comment != NULL)
+      if (strlen(comment) <= 70) {
+         fprintf(fp, "# %s", comment);
+         fwrite("\n", 1, strlen("\n"), fp);
+      }
+   fprintf(fp, "%d", maxval);
+   fwrite("\n", 1, strlen("\n"), fp);
+#else
    fprintf(fp, "P5\n%d %d\n", cols, rows);
    if(comment != NULL)
       if(strlen(comment) <= 70) fprintf(fp, "# %s\n", comment);
    fprintf(fp, "%d\n", maxval);
+#endif
 
    /***************************************************************************
    * Write the image data to the file.
@@ -1085,20 +1102,24 @@ int read_ppm_image(char *infilename, unsigned char **image_red,
 * written to the file specified by outfilename or to standard output if
 * outfilename = NULL. A comment can be written to the header if coment != NULL.
 ******************************************************************************/
-int write_ppm_image(char *outfilename, unsigned char *image_red,
-    unsigned char *image_grn, unsigned char *image_blu, int rows,
-    int cols, char *comment, int maxval)
+int write_ppm_image(char* outfilename, unsigned char* image_red,
+   unsigned char* image_grn, unsigned char* image_blu, int rows,
+   int cols, char* comment, int maxval)
 {
-   FILE *fp;
+   FILE* fp;
    long size, p;
 
    /***************************************************************************
    * Open the output image file for writing if a filename was given. If no
    * filename was provided, set fp to write to standard output.
    ***************************************************************************/
-   if(outfilename == NULL) fp = stdout;
-   else{
-      if((fp = fopen(outfilename, "w")) == NULL){
+   if (outfilename == NULL) fp = stdout;
+   else {
+#if _WIN32
+      if ((fp = fopen(outfilename, "wb")) == NULL) {
+#else
+      if ((fp = fopen(outfilename, "w")) == NULL) {
+#endif
          fprintf(stderr, "Error writing the file %s in write_pgm_image().\n",
             outfilename);
          return(0);
@@ -1108,10 +1129,23 @@ int write_ppm_image(char *outfilename, unsigned char *image_red,
    /***************************************************************************
    * Write the header information to the PGM file.
    ***************************************************************************/
+#if _WIN32
+   fwrite("P6\n", 1, strlen("P6\n"), fp);
+   fprintf(fp, "%d %d", cols, rows);
+   fwrite("\n", 1, strlen("\n"), fp);
+   if (comment != NULL)
+      if (strlen(comment) <= 70) {
+         fprintf(fp, "# %s", comment);
+         fwrite("\n", 1, strlen("\n"), fp);
+      }
+   fprintf(fp, "%d", maxval);
+   fwrite("\n", 1, strlen("\n"), fp);
+#else
    fprintf(fp, "P6\n%d %d\n", cols, rows);
    if(comment != NULL)
       if(strlen(comment) <= 70) fprintf(fp, "# %s\n", comment);
    fprintf(fp, "%d\n", maxval);
+#endif
 
    /***************************************************************************
    * Write the image data to the file.
