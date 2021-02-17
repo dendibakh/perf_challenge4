@@ -96,7 +96,7 @@ if buildOnly or buildAndRun:
         if sys.platform != 'win32':                
           subprocess.check_call("cp " + inputFileName + " " + destDir, shell=True, stdout=FNULL, stderr=FNULL)
         else:
-            subprocess.check_call("copy " + inputFileName + " " + destDir, shell=True, stdout=FNULL, stderr=FNULL)
+          subprocess.check_call("copy " + inputFileName + " " + destDir, shell=True, stdout=FNULL, stderr=FNULL)
         print("  copy image - OK")
       except:
         print("  copy image - Failed")
