@@ -467,10 +467,10 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    if(VERBOSE) printf("   Bluring the image in the X-direction.\n");
    for(r=0;r<rows;r++){
       for(c=0;c<cols;c++){
-         float dot = 0.0;
-         float sum = 0.0;
+         float dot = 0.0f;
+         float sum = 0.0f;
          int first = (c - center) >= 0 ? -center : -c;
-         int last  = (c + center) < cols ? center : cols - c;
+         const int last  = (c + center) < cols ? center : cols - c;
          for(; first<=last; first++){
             dot += (float)image[r*cols+(c+first)] * kernel[center+first];
             sum += kernel[center+first];
@@ -485,15 +485,15 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    if(VERBOSE) printf("   Bluring the image in the Y-direction.\n");
    for(r=0;r<rows;r++){
       for(c=0;c<cols;c++){
-         float sum = 0.0;
-         float dot = 0.0;
+         float sum = 0.0f;
+         float dot = 0.0f;
          int first = (r - center) >= 0 ? -center : -r;
-         int last  = (r + center) < rows ? center : rows - r;
+         const int last = (r + center) < rows ? center : rows - r;
          for(; first<=last; first++){
             dot += tempim[(r+first)*cols+c] * kernel[center+first];
             sum += kernel[center+first];
          }
-         (*smoothedim)[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5);
+         (*smoothedim)[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5f);
       }
    }
 
