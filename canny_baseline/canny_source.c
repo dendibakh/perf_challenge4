@@ -442,6 +442,7 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
       center;            /* Half of the windowsize. */
    float *tempim,        /* Buffer for separable filter gaussian smoothing. */
          *kernel;        /* A one dimensional gaussian kernel. */
+   short* smoothedimptr;
    /****************************************************************************
    * Create a 1-dimensional gaussian smoothing kernel.
    ****************************************************************************/
@@ -470,7 +471,7 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
          float dot = 0.0f;
          float sum = 0.0f;
          int first = (c - center) >= 0 ? -center : -c;
-         const int last  = (c + center) < cols ? center : cols - c;
+         const int last = (c + center) < cols ? center : cols - c;
          for(; first<=last; first++){
             dot += (float)image[r*cols+(c+first)] * kernel[center+first];
             sum += kernel[center+first];
@@ -483,6 +484,7 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    * Blur in the y - direction.
    ****************************************************************************/
    if(VERBOSE) printf("   Bluring the image in the Y-direction.\n");
+   smoothedimptr = *smoothedim;
    for(r=0;r<rows;r++){
       for(c=0;c<cols;c++){
          float sum = 0.0f;
@@ -493,7 +495,7 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
             dot += tempim[(r+first)*cols+c] * kernel[center+first];
             sum += kernel[center+first];
          }
-         (*smoothedim)[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5f);
+         smoothedimptr[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5f);
       }
    }
 
@@ -697,8 +699,7 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
     short *magrowptr,*magptr;
     short *gxrowptr,*gxptr;
     short *gyrowptr,*gyptr,z1,z2;
-    short gx,gy;
-    float mag1,mag2,xperp,yperp;
+    float mag1,mag2;
     unsigned char *resultrowptr, *resultptr;
 
    /****************************************************************************
@@ -717,8 +718,10 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
             *resultptr = (unsigned char) NOEDGE;
          }
          else{
-            xperp = -(gx = *gxptr)/((float)m00);
-            yperp = (gy = *gyptr)/((float)m00);
+            const short gx = *gxptr;
+            const short gy = *gyptr;
+            const float xperp = -gx/((float)m00);
+            const float yperp = gy/((float)m00);
 
             if(gx >= 0){
                if(gy >= 0){
@@ -789,7 +792,7 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                }
                else
                {
-                  if ((gy = *gyptr) >= 0)
+                  if (gy >= 0)
                   {
                      if (-gx >= gy)
                      {
