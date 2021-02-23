@@ -62,7 +62,7 @@
 // 6. non_max_supp(): Avoid unnecessary work if m00 is 0.
 // 7. gaussian_smooth(): Avoiding branch in innermost loop.
 // 8. Use float instead of double math.
-
+// 9. derrivative_x_y(): oop interchange for Y-direction.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -405,13 +405,12 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
    ****************************************************************************/
    if(VERBOSE) printf("   Computing the X-direction derivative.\n");
    for(r=0;r<rows;r++){
-      int pos = r * cols;
-      (*delta_x)[pos] = smoothedim[pos+1] - smoothedim[pos];
-      pos++;
-      for(c=1;c<(cols-1);c++,pos++){
-         (*delta_x)[pos] = smoothedim[pos+1] - smoothedim[pos-1];
+      c = 0;
+      (*delta_x)[r * cols + c] = smoothedim[r * cols + (c + 1)] - smoothedim[r * cols + c];
+      for(c=1;c<(cols-1);c++){
+         (*delta_x)[r * cols + c] = smoothedim[r * cols + (c + 1)] - smoothedim[r * cols + (c - 1)];
       }
-      (*delta_x)[pos] = smoothedim[pos] - smoothedim[pos-1];
+      (*delta_x)[r * cols + c] = smoothedim[r * cols + c] - smoothedim[r * cols + (c - 1)];
    }
 
    /****************************************************************************
@@ -419,14 +418,19 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
    * losing pixels.
    ****************************************************************************/
    if(VERBOSE) printf("   Computing the Y-direction derivative.\n");
+   /* do boundaries */
    for(c=0;c<cols;c++){
-      int pos = c;
-      (*delta_y)[pos] = smoothedim[pos+cols] - smoothedim[pos];
-      pos += cols;
-      for(r=1;r<(rows-1);r++,pos+=cols){
-         (*delta_y)[pos] = smoothedim[pos+cols] - smoothedim[pos-cols];
+      r = 0;
+      (*delta_y)[r * cols + c] = smoothedim[(r + 1) * cols + c] - smoothedim[r * cols + c];
+      r = rows - 1;
+      (*delta_y)[r * cols + c] = smoothedim[r * cols + c] - smoothedim[(r - 1) * cols + c];
+   }
+
+   /* do inner */
+   for(r=1;r<(rows-1);r++){
+      for(c=0;c<cols;c++){
+         (*delta_y)[r * cols + c] = smoothedim[(r + 1) * cols + c] - smoothedim[(r - 1) * cols + c];
       }
-      (*delta_y)[pos] = smoothedim[pos] - smoothedim[pos-cols];
    }
 }
 
