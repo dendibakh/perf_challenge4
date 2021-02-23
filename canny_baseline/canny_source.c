@@ -61,6 +61,7 @@
 // 5. non_max_supp(): Remove zeroing of edges
 // 6. non_max_supp(): Avoid unnecessary work if m00 is 0.
 // 7. gaussian_smooth(): Avoiding branch in innermost loop.
+// 8. Use float instead of double math.
 
 
 #include <stdio.h>
@@ -70,7 +71,7 @@
 #include <string.h>
 
 #define VERBOSE 0
-#define BOOSTBLURFACTOR 90.0
+#define BOOSTBLURFACTOR 90.0f
 
 int read_pgm_image(char *infilename, unsigned char **image, int *rows,
     int *cols);
@@ -348,7 +349,7 @@ double angle_radians(double x, double y)
 void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
         short int **magnitude)
 {
-   int r, c, pos, sq1, sq2;
+   int r, c;
 
    /****************************************************************************
    * Allocate an image to store the magnitude of the gradient.
@@ -358,11 +359,12 @@ void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
       exit(1);
    }
 
-   for(r=0,pos=0;r<rows;r++){
-      for(c=0;c<cols;c++,pos++){
-         sq1 = (int)delta_x[pos] * (int)delta_x[pos];
-         sq2 = (int)delta_y[pos] * (int)delta_y[pos];
-         (*magnitude)[pos] = (short)(0.5 + sqrt((float)sq1 + (float)sq2));
+   for(r=0;r<rows;r++){
+      for(c=0;c<cols;c++){
+         const int pos = r*cols + c;
+         const int sq1 = (int)delta_x[pos] * (int)delta_x[pos];
+         const int sq2 = (int)delta_y[pos] * (int)delta_y[pos];
+         (*magnitude)[pos] = (short)(0.5f + sqrtf((float)sq1 + (float)sq2));
       }
    }
 
@@ -383,7 +385,7 @@ void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
 void derrivative_x_y(short int *smoothedim, int rows, int cols,
         short int **delta_x, short int **delta_y)
 {
-   int r, c, pos;
+   int r, c;
 
    /****************************************************************************
    * Allocate images to store the derivatives.
@@ -403,7 +405,7 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
    ****************************************************************************/
    if(VERBOSE) printf("   Computing the X-direction derivative.\n");
    for(r=0;r<rows;r++){
-      pos = r * cols;
+      int pos = r * cols;
       (*delta_x)[pos] = smoothedim[pos+1] - smoothedim[pos];
       pos++;
       for(c=1;c<(cols-1);c++,pos++){
@@ -418,7 +420,7 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
    ****************************************************************************/
    if(VERBOSE) printf("   Computing the Y-direction derivative.\n");
    for(c=0;c<cols;c++){
-      pos = c;
+      int pos = c;
       (*delta_y)[pos] = smoothedim[pos+cols] - smoothedim[pos];
       pos += cols;
       for(r=1;r<(rows-1);r++,pos+=cols){
@@ -512,9 +514,9 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
 void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
 {
    int i, center;
-   float x, fx, sum=0.0;
+   float sum=0.0;
 
-   *windowsize = 1 + 2 * ceil(2.5 * sigma);
+   *windowsize = 1 + 2 * ceilf(2.5f * sigma);
    center = (*windowsize) / 2;
 
    if(VERBOSE) printf("      The kernel has %d elements.\n", *windowsize);
@@ -524,8 +526,8 @@ void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
    }
 
    for(i=0;i<(*windowsize);i++){
-      x = (float)(i - center);
-      fx = pow(2.71828, -0.5*x*x/(sigma*sigma)) / (sigma * sqrt(6.2831853));
+      const float x = (float)(i - center);
+      const float fx = powf(2.71828f, -0.5f*x*x/(sigma*sigma)) / (sigma * sqrtf(6.2831853f));
       (*kernel)[i] = fx;
       sum += fx;
    }
