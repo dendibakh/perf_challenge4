@@ -62,7 +62,8 @@
 // 6. non_max_supp(): Avoid unnecessary work if m00 is 0.
 // 7. gaussian_smooth(): Avoiding branch in innermost loop.
 // 8. Use float instead of double math.
-// 9. derrivative_x_y(): oop interchange for Y-direction.
+// 9. derrivative_x_y(): Loop interchange for Y-direction.
+// 10. magnitude_x_y() / apply_hysteresis(): Flattening nested loops.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -349,8 +350,6 @@ double angle_radians(double x, double y)
 void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
         short int **magnitude)
 {
-   int r, c;
-
    /****************************************************************************
    * Allocate an image to store the magnitude of the gradient.
    ****************************************************************************/
@@ -359,15 +358,11 @@ void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
       exit(1);
    }
 
-   for(r=0;r<rows;r++){
-      for(c=0;c<cols;c++){
-         const int pos = r*cols + c;
-         const int sq1 = (int)delta_x[pos] * (int)delta_x[pos];
-         const int sq2 = (int)delta_y[pos] * (int)delta_y[pos];
-         (*magnitude)[pos] = (short)(0.5f + sqrtf((float)sq1 + (float)sq2));
-      }
+   for(int pos=0;pos<rows*cols;++pos){
+      const int sq1 = (int)delta_x[pos] * (int)delta_x[pos];
+      const int sq2 = (int)delta_y[pos] * (int)delta_y[pos];
+      (*magnitude)[pos] = (short)(0.5f + sqrtf((float)sq1 + (float)sq2));
    }
-
 }
 
 /*******************************************************************************
@@ -614,13 +609,13 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
    * Compute the histogram of the magnitude image. Then use the histogram to
    * compute hysteresis thresholds.
    ****************************************************************************/
-   memset(edge, NOEDGE, rows * cols * sizeof(*edge));
-   for(r=0,pos=0;r<rows;r++){
-      for(c=0;c<cols;c++,pos++){
-	      if(nms[pos] == POSSIBLE_EDGE){
-            edge[pos] = POSSIBLE_EDGE;
-            hist[mag[pos]]++;
-         }
+   for(pos=0;pos<rows*cols;++pos){
+      if(nms[pos] == POSSIBLE_EDGE){
+         edge[pos] = POSSIBLE_EDGE;
+         hist[mag[pos]]++;
+      }
+      else{
+         edge[pos] = NOEDGE;
       }
    }
 
@@ -674,20 +669,18 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
    * This loop looks for pixels above the highthreshold to locate edges and
    * then calls follow_edges to continue the edge.
    ****************************************************************************/
-   for(r=0,pos=0;r<rows;r++){
-      for(c=0;c<cols;c++,pos++){
-	 if((edge[pos] == POSSIBLE_EDGE) && (mag[pos] >= highthreshold)){
-            edge[pos] = EDGE;
-            follow_edges((edge+pos), (mag+pos), lowthreshold, cols);
-	 }
+   for(pos=0;pos<rows*cols;++pos){
+      if((edge[pos] == POSSIBLE_EDGE) && (mag[pos] >= highthreshold)){
+         edge[pos] = EDGE;
+         follow_edges((edge+pos), (mag+pos), lowthreshold, cols);
       }
    }
 
    /****************************************************************************
    * Set all the remaining possible edges to non-edges.
    ****************************************************************************/
-   for(r=0,pos=0;r<rows;r++){
-      for(c=0;c<cols;c++,pos++) if(edge[pos] != EDGE) edge[pos] = NOEDGE;
+   for(pos=0;pos<rows*cols;++pos){
+      if(edge[pos] != EDGE) edge[pos] = NOEDGE;
    }
 }
 
