@@ -64,6 +64,7 @@
 // 8. Use float instead of double math.
 // 9. derrivative_x_y(): Loop interchange for Y-direction.
 // 10. magnitude_x_y() / apply_hysteresis(): Flattening nested loops.
+// 11. non_max_supp(): Simplifying iteration.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -93,7 +94,7 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
 void radian_direction(short int *delta_x, short int *delta_y, int rows,
     int cols, float **dir_radians, int xdirtag, int ydirtag);
 double angle_radians(double x, double y);
-void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
+void non_max_supp(const short *mag, const short *gradx, const short *grady, int nrows, int ncols,
     unsigned char *result);
 
 int main(int argc, char *argv[])
@@ -691,36 +692,30 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
 * NAME: Mike Heath
 * DATE: 2/15/96
 *******************************************************************************/
-void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
+void non_max_supp(const short *mag, const short *gradx, const short *grady, int nrows, int ncols,
     unsigned char *result)
 {
-    int rowcount, colcount;
-    short *magrowptr,*magptr;
-    short *gxrowptr,*gxptr;
-    short *gyrowptr,*gyptr,z1,z2;
-    float mag1,mag2;
-    unsigned char *resultrowptr, *resultptr;
-
    /****************************************************************************
    * Suppress non-maximum points.
    ****************************************************************************/
-   for(rowcount=1,magrowptr=mag+ncols+1,gxrowptr=gradx+ncols+1,
-      gyrowptr=grady+ncols+1,resultrowptr=result+ncols+1;
-      rowcount<nrows-2;
-      rowcount++,magrowptr+=ncols,gyrowptr+=ncols,gxrowptr+=ncols,
-      resultrowptr+=ncols){
-      for(colcount=1,magptr=magrowptr,gxptr=gxrowptr,gyptr=gyrowptr,
-         resultptr=resultrowptr;colcount<ncols-2;
-         colcount++,magptr++,gxptr++,gyptr++,resultptr++){
+   for(int rowcount=1; rowcount < nrows - 2; ++rowcount){
+      for(int colcount=1; colcount < ncols - 2; ++colcount){
+         const int pos = rowcount * ncols + colcount;
+         const short* magptr = mag + pos;
+         unsigned char *resultptr = result + pos;
          const short m00 = *magptr;
          if(m00 == 0){
             *resultptr = (unsigned char) NOEDGE;
          }
          else{
-            const short gx = *gxptr;
-            const short gy = *gyptr;
+            const short *gxptr = gradx + pos;
+            const short *gyptr = grady + pos;
+            const short gx = *(gxptr);
+            const short gy = *(gyptr);
             const float xperp = -gx/((float)m00);
             const float yperp = gy/((float)m00);
+            short z1,z2;
+            float mag1,mag2;
 
             if(gx >= 0){
                if(gy >= 0){
