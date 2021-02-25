@@ -160,6 +160,7 @@ if runOnly or buildAndRun:
         print ("Running 10 measurements loop ...")
         
       for x in range(0, 10):
+        os.remove(outputFileName);
         if sys.platform != 'win32':
           output = subprocess.check_output("time -p " + runCmd, shell=True)
           for row in output.split(b'\n'):
