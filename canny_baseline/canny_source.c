@@ -480,7 +480,6 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
          const int last = (c + center) < cols ? center : cols - c;
          const int diff = last - first;
 #define EMIT_LOOP(count) \
-_Pragma("clang loop unroll(full) vectorize(enable) interleave(enable)")\
    for(int i = 0; i < (count); ++i){ \
       const int offset = first + i; \
       dot += (float)image[r*cols+(c+offset)] * kernel[center+offset]; \
@@ -489,12 +488,15 @@ _Pragma("clang loop unroll(full) vectorize(enable) interleave(enable)")\
          switch(diff)
          {
             case 2:
+#pragma clang loop unroll(full) vectorize(enable) interleave(enable)
                EMIT_LOOP(2)
                break;
             case 3:
+#pragma clang loop unroll(full) vectorize(enable) interleave(enable)
                EMIT_LOOP(3)
                break;
             case 4:
+#pragma clang loop unroll(full) vectorize(enable) interleave(enable)
                EMIT_LOOP(4)
                break;
             default:
@@ -520,7 +522,6 @@ _Pragma("clang loop unroll(full) vectorize(enable) interleave(enable)")\
          const int last = (r + center) < rows ? center : rows - r;
          const int diff = last - first;
 #define EMIT_LOOP(count) \
-_Pragma("clang loop unroll(full) vectorize(enable) interleave(enable)")\
    for(int i = 0; i < (count); ++i){ \
       const int offset = first + i; \
       dot += tempim[(r+offset)*cols+c] * kernel[center+offset]; \
@@ -529,12 +530,15 @@ _Pragma("clang loop unroll(full) vectorize(enable) interleave(enable)")\
          switch (diff)
          {
             case 2:
+#pragma clang loop unroll(full) vectorize(enable) interleave(enable)
                EMIT_LOOP(2)
                break;
             case 3:
+#pragma clang loop unroll(full) vectorize(enable) interleave(enable)
                EMIT_LOOP(3)
                break;
             case 4:
+#pragma clang loop unroll(full) vectorize(enable) interleave(enable)
                EMIT_LOOP(4)
                break;
             default:
