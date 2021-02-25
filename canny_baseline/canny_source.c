@@ -65,6 +65,7 @@
 // 9. derrivative_x_y(): Loop interchange for Y-direction.
 // 10. magnitude_x_y() / apply_hysteresis(): Flattening nested loops.
 // 11. non_max_supp(): Simplifying iteration.
+// 12. Adding const and restrict on pointer arguments.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -89,7 +90,7 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
         short int **delta_x, short int **delta_y);
 void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
         short int **magnitude);
-void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
+void apply_hysteresis(const short int *mag, const unsigned char *nms, int rows, int cols,
         float tlow, float thigh, unsigned char *edge);
 void radian_direction(short int *delta_x, short int *delta_y, int rows,
     int cols, float **dir_radians, int xdirtag, int ydirtag);
@@ -348,8 +349,8 @@ double angle_radians(double x, double y)
 * NAME: Mike Heath
 * DATE: 2/15/96
 *******************************************************************************/
-void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
-        short int **magnitude)
+void magnitude_x_y(short int * restrict delta_x, short int * restrict delta_y, int rows, int cols,
+        short int ** restrict magnitude)
 {
    /****************************************************************************
    * Allocate an image to store the magnitude of the gradient.
@@ -378,8 +379,8 @@ void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
 * NAME: Mike Heath
 * DATE: 2/15/96
 *******************************************************************************/
-void derrivative_x_y(short int *smoothedim, int rows, int cols,
-        short int **delta_x, short int **delta_y)
+void derrivative_x_y(short int * restrict smoothedim, int rows, int cols,
+        short int ** restrict delta_x, short int ** restrict delta_y)
 {
    int r, c;
 
@@ -564,7 +565,7 @@ void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
 * NAME: Mike Heath
 * DATE: 2/15/96
 *******************************************************************************/
-void follow_edges(unsigned char *edgemapptr, short *edgemagptr, short lowval,
+void follow_edges(unsigned char * restrict edgemapptr, const short * restrict edgemagptr, short lowval,
    int cols)
 {
    int i;
@@ -573,7 +574,7 @@ void follow_edges(unsigned char *edgemapptr, short *edgemagptr, short lowval,
 
    for(i=0;i<8;i++){
       unsigned char *tempmapptr = edgemapptr - y[i]*cols + x[i];
-      short *tempmagptr = edgemagptr - y[i]*cols + x[i];
+      const short *tempmagptr = edgemagptr - y[i]*cols + x[i];
 
       if((*tempmapptr == POSSIBLE_EDGE) && (*tempmagptr > lowval)){
          *tempmapptr = (unsigned char) EDGE;
@@ -590,7 +591,7 @@ void follow_edges(unsigned char *edgemapptr, short *edgemagptr, short lowval,
 * NAME: Mike Heath
 * DATE: 2/15/96
 *******************************************************************************/
-void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
+void apply_hysteresis(const short int *mag, const unsigned char *nms, int rows, int cols,
 	float tlow, float thigh, unsigned char *edge)
 {
    int r, c, pos, numedges, highcount, lowthreshold, highthreshold, hist[32768];
@@ -692,8 +693,8 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
 * NAME: Mike Heath
 * DATE: 2/15/96
 *******************************************************************************/
-void non_max_supp(const short *mag, const short *gradx, const short *grady, int nrows, int ncols,
-    unsigned char *result)
+void non_max_supp(const short * restrict mag, const short * restrict gradx, const short * restrict grady, int nrows, int ncols,
+    unsigned char * restrict result)
 {
    /****************************************************************************
    * Suppress non-maximum points.
