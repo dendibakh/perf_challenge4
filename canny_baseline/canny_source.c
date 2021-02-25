@@ -445,7 +445,7 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
       center;            /* Half of the windowsize. */
    float *tempim,        /* Buffer for separable filter gaussian smoothing. */
          *kernel;        /* A one dimensional gaussian kernel. */
-   short* smoothedimptr;
+
    /****************************************************************************
    * Create a 1-dimensional gaussian smoothing kernel.
    ****************************************************************************/
@@ -498,7 +498,7 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
             dot += tempim[(r+first)*cols+c] * kernel[center+first];
             sum += kernel[center+first];
          }
-         smoothedimptr[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5f);
+         (*smoothedim)[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5f);
       }
    }
 
@@ -720,8 +720,8 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
 
             if(gx >= 0){
                if(gy >= 0){
-                     if (gx >= gy)
-                     {
+                    if (gx >= gy)
+                    {
                         /* 111 */
                         /* Left point */
                         z1 = *(magptr - 1);
@@ -734,9 +734,9 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         z2 = *(magptr + ncols + 1);
 
                         mag2 = (m00 - z1)*xperp + (z2 - z1)*yperp;
-                     }
-                     else
-                     {
+                    }
+                    else
+                    {
                         /* 110 */
                         /* Left point */
                         z1 = *(magptr - ncols);
@@ -749,12 +749,12 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         z2 = *(magptr + ncols + 1);
 
                         mag2 = (z1 - z2)*xperp + (z1 - m00)*yperp;
-                     }
-                  }
-                  else
-                  {
-                     if (gx >= -gy)
-                     {
+                    }
+                }
+                else
+                {
+                    if (gx >= -gy)
+                    {
                         /* 101 */
                         /* Left point */
                         z1 = *(magptr - 1);
@@ -767,9 +767,9 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         z2 = *(magptr - ncols + 1);
 
                         mag2 = (m00 - z1)*xperp + (z1 - z2)*yperp;
-                     }
-                     else
-                     {
+                    }
+                    else
+                    {
                         /* 100 */
                         /* Left point */
                         z1 = *(magptr + ncols);
@@ -782,15 +782,15 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         z2 = *(magptr - ncols + 1);
 
                         mag2 = (z1 - z2)*xperp  + (m00 - z1)*yperp;
-                     }
-                  }
-               }
-               else
-               {
-                  if (gy >= 0)
-                  {
-                     if (-gx >= gy)
-                     {
+                    }
+                }
+            }
+            else
+            {
+                if (gy >= 0)
+                {
+                    if (-gx >= gy)
+                    {
                         /* 011 */
                         /* Left point */
                         z1 = *(magptr + 1);
@@ -803,9 +803,9 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         z2 = *(magptr + ncols - 1);
 
                         mag2 = (z1 - m00)*xperp + (z2 - z1)*yperp;
-                     }
-                     else
-                     {
+                    }
+                    else
+                    {
                         /* 010 */
                         /* Left point */
                         z1 = *(magptr - ncols);
@@ -818,12 +818,12 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         z2 = *(magptr + ncols - 1);
 
                         mag2 = (z2 - z1)*xperp + (z1 - m00)*yperp;
-                     }
-                  }
-                  else
-                  {
-                     if (-gx > -gy)
-                     {
+                    }
+                }
+                else
+                {
+                    if (-gx > -gy)
+                    {
                         /* 001 */
                         /* Left point */
                         z1 = *(magptr + 1);
@@ -836,9 +836,9 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         z2 = *(magptr - ncols - 1);
 
                         mag2 = (z1 - m00)*xperp + (z1 - z2)*yperp;
-                     }
-                     else
-                     {
+                    }
+                    else
+                    {
                         /* 000 */
                         /* Left point */
                         z1 = *(magptr + ncols);
@@ -851,15 +851,15 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         z2 = *(magptr - ncols - 1);
 
                         mag2 = (z2 - z1)*xperp + (m00 - z1)*yperp;
-                  }
-               }
+                    }
+                }
             }
 
             /* Now determine if the current point is a maximum point */
 
             if ((mag1 > 0.0) || (mag2 >= 0.0))
             {
-               *resultptr = (unsigned char) NOEDGE;
+                *resultptr = (unsigned char) NOEDGE;
             }
             else
             {
@@ -867,7 +867,7 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
             }
          }
       }
-   }
+    }
 }
 /*******************************************************************************
 * FILE: pgm_io.c
