@@ -67,6 +67,7 @@
 // 11. non_max_supp(): Simplifying iteration.
 // 12. Adding const and restrict on pointer arguments.
 // 13. apply_hysteresis(): Simplify setting edges at boundaries.
+// 14. gaussian_smooth(): Manually unrolling inner loops.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -474,14 +475,36 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
       for(c=0;c<cols;c++){
          float dot = 0.0f;
          float sum = 0.0f;
-         int first = (c - center) >= 0 ? -center : -c;
+         const int first = (c - center) >= 0 ? -center : -c;
          const int last = (c + center) < cols ? center : cols - c;
-         for(; first<=last; first++){
-            dot += (float)image[r*cols+(c+first)] * kernel[center+first];
-            sum += kernel[center+first];
+         const int diff = last - first;
+#define EMIT_LOOP(count) \
+_Pragma("clang loop unroll(full) vectorize(enable) interleave(enable)")\
+   for(int i = 0; i < (count); ++i){ \
+      const int offset = first + i; \
+      dot += (float)image[r*cols+(c+offset)] * kernel[center+offset]; \
+      sum += kernel[center+offset]; \
+   }
+         switch(diff)
+         {
+            case 2:
+               EMIT_LOOP(2)
+               break;
+            case 3:
+               EMIT_LOOP(3)
+               break;
+            case 4:
+               EMIT_LOOP(4)
+               break;
+            default:
+               /* fallback */
+               /* printf("%s:%d: Add case for %d\n", __FUNCTION__, __LINE__, diff); */
+               EMIT_LOOP(diff)
+               break;
          }
          tempim[r*cols+c] = dot/sum;
       }
+#undef EMIT_LOOP
    }
 
    /****************************************************************************
@@ -492,11 +515,32 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
       for(c=0;c<cols;c++){
          float sum = 0.0f;
          float dot = 0.0f;
-         int first = (r - center) >= 0 ? -center : -r;
+         const int first = (r - center) >= 0 ? -center : -r;
          const int last = (r + center) < rows ? center : rows - r;
-         for(; first<=last; first++){
-            dot += tempim[(r+first)*cols+c] * kernel[center+first];
-            sum += kernel[center+first];
+         const int diff = last - first;
+#define EMIT_LOOP(count) \
+_Pragma("clang loop unroll(full) vectorize(enable) interleave(enable)")\
+   for(int i = 0; i < (count); ++i){ \
+      const int offset = first + i; \
+      dot += tempim[(r+offset)*cols+c] * kernel[center+offset]; \
+      sum += kernel[center+offset]; \
+   }
+         switch (diff)
+         {
+            case 2:
+               EMIT_LOOP(2)
+               break;
+            case 3:
+               EMIT_LOOP(3)
+               break;
+            case 4:
+               EMIT_LOOP(4)
+               break;
+            default:
+               /* fallback */
+               /* printf("%s:%d: Add case for %d\n", __FUNCTION__, __LINE__, diff); */
+               EMIT_LOOP(diff)
+               break;
          }
          (*smoothedim)[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5f);
       }
