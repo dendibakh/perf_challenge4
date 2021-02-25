@@ -487,7 +487,6 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    * Blur in the y - direction.
    ****************************************************************************/
    if(VERBOSE) printf("   Bluring the image in the Y-direction.\n");
-   smoothedimptr = *smoothedim;
    for(r=0;r<rows;r++){
       for(c=0;c<cols;c++){
          float sum = 0.0f;
