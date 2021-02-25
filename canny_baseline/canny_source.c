@@ -714,8 +714,8 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
             const short gy = *(gyptr);
             const float xperp = -gx/((float)m00);
             const float yperp = gy/((float)m00);
-            short z1,z2;
             float mag1,mag2;
+            short z1,z2,z3,z4;
 
             if(gx >= 0){
                if(gy >= 0){
@@ -729,10 +729,10 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         mag1 = (m00 - z1)*xperp + (z2 - z1)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr + 1);
-                        z2 = *(magptr + ncols + 1);
+                        z3 = *(magptr + 1);
+                        z4 = *(magptr + ncols + 1);
 
-                        mag2 = (m00 - z1)*xperp + (z2 - z1)*yperp;
+                        mag2 = (m00 - z3)*xperp + (z4 - z3)*yperp;
                     }
                     else
                     {
@@ -744,10 +744,10 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         mag1 = (z1 - z2)*xperp + (z1 - m00)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr + ncols);
-                        z2 = *(magptr + ncols + 1);
+                        z3 = *(magptr + ncols);
+                        z4 = *(magptr + ncols + 1);
 
-                        mag2 = (z1 - z2)*xperp + (z1 - m00)*yperp;
+                        mag2 = (z3 - z4)*xperp + (z3 - m00)*yperp;
                     }
                 }
                 else
@@ -762,10 +762,10 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         mag1 = (m00 - z1)*xperp + (z1 - z2)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr + 1);
-                        z2 = *(magptr - ncols + 1);
+                        z3 = *(magptr + 1);
+                        z4 = *(magptr - ncols + 1);
 
-                        mag2 = (m00 - z1)*xperp + (z1 - z2)*yperp;
+                        mag2 = (m00 - z3)*xperp + (z3 - z4)*yperp;
                     }
                     else
                     {
@@ -777,10 +777,10 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         mag1 = (z1 - z2)*xperp + (m00 - z1)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr - ncols);
-                        z2 = *(magptr - ncols + 1);
+                        z3 = *(magptr - ncols);
+                        z4 = *(magptr - ncols + 1);
 
-                        mag2 = (z1 - z2)*xperp  + (m00 - z1)*yperp;
+                        mag2 = (z3 - z4)*xperp  + (m00 - z3)*yperp;
                     }
                 }
             }
@@ -798,10 +798,10 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         mag1 = (z1 - m00)*xperp + (z2 - z1)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr - 1);
-                        z2 = *(magptr + ncols - 1);
+                        z3 = *(magptr - 1);
+                        z4 = *(magptr + ncols - 1);
 
-                        mag2 = (z1 - m00)*xperp + (z2 - z1)*yperp;
+                        mag2 = (z3 - m00)*xperp + (z4 - z3)*yperp;
                     }
                     else
                     {
@@ -813,10 +813,10 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         mag1 = (z2 - z1)*xperp + (z1 - m00)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr + ncols);
-                        z2 = *(magptr + ncols - 1);
+                        z3 = *(magptr + ncols);
+                        z4 = *(magptr + ncols - 1);
 
-                        mag2 = (z2 - z1)*xperp + (z1 - m00)*yperp;
+                        mag2 = (z4 - z3)*xperp + (z3 - m00)*yperp;
                     }
                 }
                 else
@@ -831,10 +831,10 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         mag1 = (z1 - m00)*xperp + (z1 - z2)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr - 1);
-                        z2 = *(magptr - ncols - 1);
+                        z3 = *(magptr - 1);
+                        z4 = *(magptr - ncols - 1);
 
-                        mag2 = (z1 - m00)*xperp + (z1 - z2)*yperp;
+                        mag2 = (z3 - m00)*xperp + (z3 - z4)*yperp;
                     }
                     else
                     {
@@ -846,10 +846,10 @@ void non_max_supp(const short * restrict mag, const short * restrict gradx, cons
                         mag1 = (z2 - z1)*xperp + (m00 - z1)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr - ncols);
-                        z2 = *(magptr - ncols - 1);
+                        z3 = *(magptr - ncols);
+                        z4 = *(magptr - ncols - 1);
 
-                        mag2 = (z2 - z1)*xperp + (m00 - z1)*yperp;
+                        mag2 = (z4 - z3)*xperp + (m00 - z3)*yperp;
                     }
                 }
             }
