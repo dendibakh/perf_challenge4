@@ -56,7 +56,7 @@
 // Changes
 // 1. Replace calloc() calls with malloc().
 // 2. gaussian_smooth(): Loop interchange for Y-direction.
-// 3. apply_hysteresis(): Fusing edge detection and histogram calculation.
+// 3. apply_hysteresis(): Fusing edge set-up and histogram calculation.
 // 4. follow_edges(): Better locality through x, y reordering.
 // 5. non_max_supp(): Remove zeroing of edges
 // 6. non_max_supp(): Avoid unnecessary work if m00 is 0.
@@ -68,6 +68,7 @@
 // 12. Adding const and restrict on pointer arguments.
 // 13. apply_hysteresis(): Simplify setting edges at boundaries.
 // 14. gaussian_smooth(): Manually unrolling inner loops.
+// 15. apply_hysteresis(): Fusing edge calculation with edge set-up.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -638,10 +639,8 @@ void follow_edges(unsigned char * restrict edgemapptr, const short * restrict ed
 void apply_hysteresis(const short int *mag, const unsigned char *nms, int rows, int cols,
 	float tlow, float thigh, unsigned char *edge)
 {
-   int r, c, pos, numedges, highcount, lowthreshold, highthreshold, hist[32768];
+   int r, c, pos, numedges, highcount, lowthreshold, highthreshold, hist[32768] = {0};
    short int maximum_mag;
-
-   memset(hist, 0, 32768 * sizeof(*hist));
 
    /****************************************************************************
    * Initialize the edge map to possible edges everywhere the non-maximal
@@ -655,10 +654,18 @@ void apply_hysteresis(const short int *mag, const unsigned char *nms, int rows, 
    * Compute the histogram of the magnitude image. Then use the histogram to
    * compute hysteresis thresholds.
    ****************************************************************************/
+   numedges = 0;
+   maximum_mag = 0;
    for(pos=0;pos<rows*cols;++pos){
       if(nms[pos] == POSSIBLE_EDGE){
          edge[pos] = POSSIBLE_EDGE;
          hist[mag[pos]]++;
+
+         /* Compute the number of pixels that passed the nonmaximal suppression. */
+         ++numedges;
+         if (mag[pos] > maximum_mag){
+            maximum_mag = mag[pos];
+         }
       }
       else{
          edge[pos] = NOEDGE;
@@ -675,14 +682,6 @@ void apply_hysteresis(const short int *mag, const unsigned char *nms, int rows, 
    for(c=0;c<cols;c++){
       edge[c] = NOEDGE;
       edge[pos + c] = NOEDGE;
-   }
-
-   /****************************************************************************
-   * Compute the number of pixels that passed the nonmaximal suppression.
-   ****************************************************************************/
-   for(r=1,numedges=0;r<32768;r++){
-      if(hist[r] != 0) maximum_mag = r;
-      numedges += hist[r];
    }
 
    highcount = (int)(numedges * thigh + 0.5);
