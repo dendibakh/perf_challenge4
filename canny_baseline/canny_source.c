@@ -478,31 +478,31 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
          float sum = 0.0f;
          const int first = (c - center) >= 0 ? -center : -c;
          const int last = (c + center) < cols ? center : cols - c;
-         const int diff = last - first;
+         const int count = last - first;
 #define EMIT_LOOP(count) \
    for(int i = 0; i < (count); ++i){ \
       const int offset = first + i; \
       dot += (float)image[r*cols+(c+offset)] * kernel[center+offset]; \
       sum += kernel[center+offset]; \
    }
-         switch(diff)
+         switch(count)
          {
-            case 2:
+            case 4:
 #pragma clang loop unroll(full) vectorize(enable) interleave(enable)
-               EMIT_LOOP(2)
+               EMIT_LOOP(4)
                break;
             case 3:
 #pragma clang loop unroll(full) vectorize(enable) interleave(enable)
                EMIT_LOOP(3)
                break;
-            case 4:
+            case 2:
 #pragma clang loop unroll(full) vectorize(enable) interleave(enable)
-               EMIT_LOOP(4)
+               EMIT_LOOP(2)
                break;
             default:
                /* fallback */
-               /* printf("%s:%d: Add case for %d\n", __FUNCTION__, __LINE__, diff); */
-               EMIT_LOOP(diff)
+               /* printf("%s:%d: Add case for %d\n", __FUNCTION__, __LINE__, count); */
+               EMIT_LOOP(count)
                break;
          }
          tempim[r*cols+c] = dot/sum;
@@ -520,31 +520,31 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
          float dot = 0.0f;
          const int first = (r - center) >= 0 ? -center : -r;
          const int last = (r + center) < rows ? center : rows - r;
-         const int diff = last - first;
+         const int count = last - first;
 #define EMIT_LOOP(count) \
    for(int i = 0; i < (count); ++i){ \
       const int offset = first + i; \
       dot += tempim[(r+offset)*cols+c] * kernel[center+offset]; \
       sum += kernel[center+offset]; \
    }
-         switch (diff)
+         switch (count)
          {
-            case 2:
+            case 4:
 #pragma clang loop unroll(full) vectorize(enable) interleave(enable)
-               EMIT_LOOP(2)
+               EMIT_LOOP(4)
                break;
             case 3:
 #pragma clang loop unroll(full) vectorize(enable) interleave(enable)
                EMIT_LOOP(3)
                break;
-            case 4:
+            case 2:
 #pragma clang loop unroll(full) vectorize(enable) interleave(enable)
-               EMIT_LOOP(4)
+               EMIT_LOOP(2)
                break;
             default:
                /* fallback */
-               /* printf("%s:%d: Add case for %d\n", __FUNCTION__, __LINE__, diff); */
-               EMIT_LOOP(diff)
+               /* printf("%s:%d: Add case for %d\n", __FUNCTION__, __LINE__, count); */
+               EMIT_LOOP(count)
                break;
          }
          (*smoothedim)[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5f);
