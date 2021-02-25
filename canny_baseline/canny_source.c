@@ -66,6 +66,7 @@
 // 10. magnitude_x_y() / apply_hysteresis(): Flattening nested loops.
 // 11. non_max_supp(): Simplifying iteration.
 // 12. Adding const and restrict on pointer arguments.
+// 13. apply_hysteresis(): Simplify setting edges at boundaries.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -620,14 +621,16 @@ void apply_hysteresis(const short int *mag, const unsigned char *nms, int rows, 
       }
    }
 
-   for(r=0,pos=0;r<rows;r++,pos+=cols){
+   for(r=0;r<rows;r++){
+      pos = r * cols;
       edge[pos] = NOEDGE;
       edge[pos+cols-1] = NOEDGE;
    }
+
    pos = (rows-1) * cols;
-   for(c=0;c<cols;c++,pos++){
+   for(c=0;c<cols;c++){
       edge[c] = NOEDGE;
-      edge[pos] = NOEDGE;
+      edge[pos + c] = NOEDGE;
    }
 
    /****************************************************************************
