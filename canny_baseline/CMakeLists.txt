@@ -1,9 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
-project(canny)
 
 if(NOT MSVC)
-    set(CMAKE_CXX_FLAGS "-O3 -ffast-math -march=core-avx2 ${CMAKE_CXX_FLAGS} -Rpass-missed=loop-vectorize -Wall")
-    set(CMAKE_C_FLAGS "-O3 -ffast-math -march=core-avx2 ${CMAKE_C_FLAGS} -Rpass-missed=loop-vectorize -Wall")
+    set(CMAKE_CXX_FLAGS "-O3 -ffast-math -march=core-avx2 ${CMAKE_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "-O3 -ffast-math -march=core-avx2 ${CMAKE_C_FLAGS}")
 else()
     set(CMAKE_CXX_FLAGS "/O2 /fp:fast /arch:AVX2 ${CMAKE_CXX_FLAGS}")
     set(CMAKE_C_FLAGS "/O2 /fp:fast /arch:AVX2 ${CMAKE_C_FLAGS}")
