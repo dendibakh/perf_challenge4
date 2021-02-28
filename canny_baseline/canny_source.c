@@ -479,11 +479,11 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
          const int first = (c - center) >= 0 ? -center : -c;
          const int last = (c + center) < cols ? center : cols - c;
          const int count = last - first;
-#define EMIT_LOOP(count) \
-   for(int i = 0; i < (count); ++i){ \
-      const int offset = first + i; \
+#define EMIT_LOOP(count)                                              \
+   for(int i = 0; i < (count); ++i){                                  \
+      const int offset = first + i;                                   \
       dot += (float)image[r*cols+(c+offset)] * kernel[center+offset]; \
-      sum += kernel[center+offset]; \
+      sum += kernel[center+offset];                                   \
    }
          switch(count)
          {
@@ -521,11 +521,11 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
          const int first = (r - center) >= 0 ? -center : -r;
          const int last = (r + center) < rows ? center : rows - r;
          const int count = last - first;
-#define EMIT_LOOP(count) \
-   for(int i = 0; i < (count); ++i){ \
-      const int offset = first + i; \
+#define EMIT_LOOP(count)                                        \
+   for(int i = 0; i < (count); ++i){                            \
+      const int offset = first + i;                             \
       dot += tempim[(r+offset)*cols+c] * kernel[center+offset]; \
-      sum += kernel[center+offset]; \
+      sum += kernel[center+offset];                             \
    }
          switch (count)
          {
