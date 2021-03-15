@@ -63,9 +63,9 @@
 #define VERBOSE 0
 #define BOOSTBLURFACTOR 90.0
 
-#define NOEDGE 255
-#define POSSIBLE_EDGE 128
-#define EDGE 0
+#define NOEDGE 0
+#define POSSIBLE_EDGE 1
+#define EDGE 2
 
 int read_pgm_image(char *infilename, unsigned char **image, int *rows,
     int *cols);
@@ -172,7 +172,7 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
          float tlow, float thigh, unsigned char **edge, char *fname)
 {
    *edge = (unsigned char*)malloc(sizeof(unsigned char) * rows * cols);
-   short* magnitude = (short*)malloc(sizeof(short) * rows * cols);
+   short* magnitude = (short*)malloc(sizeof(short) * (rows - 1) * cols);
 
    if (!*edge || !magnitude) {
        fprintf(stderr, "Error allocating.\n");
@@ -216,7 +216,9 @@ void gaussian_smooth_derivative_magnitude_nms(unsigned char *image, int rows, in
          sum, k;         /* Sum of the kernel weights variable. */
    double scale;
    short int *z0, *z1, *z2, *x0, *x1, *x2, *y1, *y2, *swap;
+#if !USE_INTRINSICS
    int dx, dy;
+#endif
 
    /****************************************************************************
    * Create a 1-dimensional gaussian smoothing kernel.
@@ -393,25 +395,6 @@ void gaussian_smooth_derivative_magnitude_nms(unsigned char *image, int rows, in
    }
 
    /****************************************************************************
-   * Compute the y-derivative. Adjust the derivative at the borders to avoid
-   * losing pixels.
-   ****************************************************************************/
-   for (c = 0; c < cols; c++) {
-       y1[c] = z1[c] - z2[c];
-   }
-
-   /*******************************************************************************
-   * PURPOSE: Compute the magnitude of the gradient. This is the square root of
-   * the sum of the squared derivative values.
-   *******************************************************************************/
-   pos = (rows - 1) * cols;
-   for (c = 0; c < cols; c++, pos++) {
-       dx = x1[pos];
-       dy = y1[pos];
-       magnitude[pos] = (short)(0.5f + sqrtf(dx * dx + dy * dy));
-   }
-
-   /****************************************************************************
    * Zero the edges of the result image.
    ****************************************************************************/
    pos = (rows - 2) * cols;
@@ -492,10 +475,12 @@ void apply_hysteresis(short int *mag, int rows, int cols,
 {
    const int delta[8] = { -1, 1, -1 - cols, 0 - cols, 1 - cols, -1 + cols, 0 + cols, 1 + cols };
 
-   int r, pos, numedges, highcount, lowthreshold, highthreshold,
+   int r, pos, numedges, highcount,
        hist[32768];
-   int *poses, *poses_write, e, m, f, i;
+   int *poses, *poses_write, i;
    int maximum_mag;
+   short int highthreshold, lowthreshold, m;
+   unsigned char e, f;
 
    /****************************************************************************
    * Compute the histogram of the magnitude image. Then use the histogram to
@@ -504,7 +489,7 @@ void apply_hysteresis(short int *mag, int rows, int cols,
    for(r=0;r<32768;r++) hist[r] = 0;
 
    for (pos = cols, r = cols * (rows - 2); pos < r; pos++) {
-       hist[mag[pos]] += (edge[pos] == POSSIBLE_EDGE);
+       hist[mag[pos]] += edge[pos];
    }
 
    /****************************************************************************
@@ -535,8 +520,8 @@ void apply_hysteresis(short int *mag, int rows, int cols,
       r++;
       numedges += hist[r];
    }
-   highthreshold = r;
-   lowthreshold = (int)(highthreshold * tlow + 0.5);
+   highthreshold = (short)r;
+   lowthreshold = (short)(r * tlow + 0.5);
 
    if(VERBOSE){
       printf("The input low and high fractions of %f and %f computed to\n",
@@ -554,18 +539,18 @@ void apply_hysteresis(short int *mag, int rows, int cols,
        exit(1);
    }
 
+   highthreshold--;
+   lowthreshold = min(lowthreshold, highthreshold);
    for (pos = cols, r = cols * (rows - 2); pos < r; pos++) {
        m = mag[pos];
        e = edge[pos];
-       f = (m >= highthreshold) & (e == POSSIBLE_EDGE);
-       e = (m > lowthreshold) ? e : NOEDGE;
-       edge[pos] = f ? EDGE : e;
+       edge[pos] = -e & ((m > lowthreshold) + (m > highthreshold));
    }
 
    poses_write = poses;
    for (pos = cols, r = cols * (rows - 2); pos < r; pos++) {
        *poses_write = pos;
-       poses_write += (edge[pos] == EDGE);
+       poses_write += (edge[pos] >> 1);
    }
 
    while (poses_write != poses) {
@@ -576,21 +561,21 @@ void apply_hysteresis(short int *mag, int rows, int cols,
            *poses_write = pos;
 
            e = edge[pos];
-           f = (e == POSSIBLE_EDGE);
+           f = (e & POSSIBLE_EDGE);
            poses_write += f;
 
-           edge[pos] = f ? EDGE : e;
+           edge[pos] = e + f;
        }
    }
-
-   free(poses);
 
    /****************************************************************************
    * Set all the remaining possible edges to non-edges.
    ****************************************************************************/
-   for (pos = cols, r = cols * (rows - 2); pos < r; pos++) {
-       edge[pos] = (edge[pos] != EDGE) ? NOEDGE : EDGE;
+   for (pos = 0, r = cols * rows; pos < r; pos++) {
+       edge[pos] = -(edge[pos] != EDGE);
    }
+
+   free(poses);
 }
 
 /*******************************************************************************
@@ -673,7 +658,7 @@ static void non_max_supp(short* mag, short* gradx, short* grady, int cols,
 
         /* Now determine if the current point is a maximum point */
 
-        result[colcount] = (mag1 | mag2) ? (unsigned char)NOEDGE : (unsigned char)POSSIBLE_EDGE;
+        result[colcount] = !(mag1 | mag2);
     }
     result[cols - 2] = NOEDGE;
     result[cols - 1] = NOEDGE;
