@@ -653,21 +653,108 @@ static void non_max_supp(short* mag, short* gradx, short* grady, int cols,
     unsigned char mag1, mag2;
 
     result[0] = NOEDGE;
-    for (colcount = 1; colcount < cols - 2; colcount++) {
-        z2L = mag[colcount - cols - 1];
-        z2 = mag[colcount - cols];
-        z2R = mag[colcount - cols + 1];
 
-        z1 = mag[colcount - 1];
-        m = mag[colcount];
-        z3 = mag[colcount + 1];
+    colcount = 1;
+#if USE_INTRINSICS
+    for (; colcount < cols - (2 + 15); colcount += 16) {
+        __m256i vgx = _mm256_loadu_si256((const __m256i*)&gradx[colcount]);
+        __m256i vgy = _mm256_loadu_si256((const __m256i*)&grady[colcount]);
 
-        z4L = mag[colcount + cols - 1];
-        z4 = mag[colcount + cols];
-        z4R = mag[colcount + cols + 1];
+        __m256i vz2L = _mm256_loadu_si256((const __m256i*)&mag[colcount - cols - 1]);
+        __m256i vz1 = _mm256_loadu_si256((const __m256i*)&mag[colcount - 1]);
+        __m256i vz4L = _mm256_loadu_si256((const __m256i*)&mag[colcount + cols - 1]);
 
+        __m256i vz2 = _mm256_loadu_si256((const __m256i*)&mag[colcount - cols]);
+        __m256i vm = _mm256_loadu_si256((const __m256i*)&mag[colcount]);
+        __m256i vz4 = _mm256_loadu_si256((const __m256i*)&mag[colcount + cols]);
+
+        __m256i vz2R = _mm256_loadu_si256((const __m256i*)&mag[colcount - cols + 1]);
+        __m256i vz3 = _mm256_loadu_si256((const __m256i*)&mag[colcount + 1]);
+        __m256i vz4R = _mm256_loadu_si256((const __m256i*)&mag[colcount + cols + 1]);
+
+        __m256i vnegx = _mm256_srai_epi16(vgx, 15);
+        vgx = _mm256_abs_epi16(vgx);
+
+        __m256i vnegy = _mm256_srai_epi16(vgy, 15);
+        vgy = _mm256_abs_epi16(vgy);
+
+        __m256i vswapg = _mm256_cmpgt_epi16(vgy, vgx);
+
+        //
+
+        __m256i vzmx = _mm256_and_si256(_mm256_xor_si256(vz1, vz3), vnegx);
+        vz1 = _mm256_xor_si256(vz1, vzmx);
+        vz3 = _mm256_xor_si256(vz3, vzmx);
+
+        __m256i vzmy = _mm256_and_si256(_mm256_xor_si256(vz2, vz4), vnegy);
+        vz2 = _mm256_xor_si256(vz2, vzmy);
+        vz4 = _mm256_xor_si256(vz4, vzmy);
+
+        vz1 = _mm256_blendv_epi8(vz1, vz2, vswapg);
+        vz3 = _mm256_blendv_epi8(vz3, vz4, vswapg);
+
+        //
+
+        __m256i vnegxy = _mm256_xor_si256(vnegx, vnegy);
+        vz2 = _mm256_blendv_epi8(vz2L, vz2R, vnegxy);
+        vz4 = _mm256_blendv_epi8(vz4R, vz4L, vnegxy);
+
+        vzmy = _mm256_and_si256(_mm256_xor_si256(vz2, vz4), vnegy);
+        vz2 = _mm256_xor_si256(vz2, vzmy);
+        vz4 = _mm256_xor_si256(vz4, vzmy);
+
+        //
+
+        __m256i vgm = _mm256_and_si256(_mm256_xor_si256(vgx, vgy), vswapg);
+        vgx = _mm256_xor_si256(vgx, vgm);
+        vgy = _mm256_xor_si256(vgy, vgm);
+
+        vz2 = _mm256_sub_epi16(vz2, vz1);
+        vz4 = _mm256_sub_epi16(vz4, vz3);
+        vz1 = _mm256_sub_epi16(vz1, vm);
+        vz3 = _mm256_sub_epi16(vz3, vm);
+
+        __m256i vgL = _mm256_unpacklo_epi16(vgx, vgy);
+        __m256i vgH = _mm256_unpackhi_epi16(vgx, vgy);
+
+        __m256i vmag1L = _mm256_madd_epi16(_mm256_unpacklo_epi16(vz1, vz2), vgL);
+        __m256i vmag1H = _mm256_madd_epi16(_mm256_unpackhi_epi16(vz1, vz2), vgH);
+
+        __m256i vcmp = _mm256_setzero_si256();
+        vmag1L = _mm256_cmpgt_epi32(vmag1L, vcmp);
+        vmag1H = _mm256_cmpgt_epi32(vmag1H, vcmp);
+
+        __m256i vmag2L = _mm256_madd_epi16(_mm256_unpacklo_epi16(vz3, vz4), vgL);
+        __m256i vmag2H = _mm256_madd_epi16(_mm256_unpackhi_epi16(vz3, vz4), vgH);
+
+        vcmp = _mm256_cmpeq_epi32(vcmp, vcmp);
+        vmag2L = _mm256_cmpgt_epi32(vmag2L, vcmp);
+        vmag2H = _mm256_cmpgt_epi32(vmag2H, vcmp);
+
+        // Now determine if the current point is a maximum point
+        __m256i vmag = _mm256_packs_epi32(_mm256_or_si256(vmag1L, vmag2L), _mm256_or_si256(vmag1H, vmag2H));
+        __m128i mmag = _mm_packs_epi16(_mm256_castsi256_si128(vmag), _mm256_extracti128_si256(vmag, 1));
+
+        mmag = _mm_sub_epi8(mmag, _mm256_castsi256_si128(vcmp));
+
+        _mm_storeu_si128((__m128i*)&result[colcount], mmag);
+    }
+#endif
+    for (; colcount < cols - 2; colcount++) {
         gx = gradx[colcount];
         gy = grady[colcount];
+
+        z2L = mag[colcount - cols - 1];
+        z1 = mag[colcount - 1];
+        z4L = mag[colcount + cols - 1];
+
+        z2 = mag[colcount - cols];
+        m = mag[colcount];
+        z4 = mag[colcount + cols];
+
+        z2R = mag[colcount - cols + 1];
+        z3 = mag[colcount + 1];
+        z4R = mag[colcount + cols + 1];
 
         negx = -(gx < 0);
         gx = (gx < 0) ? -gx : gx;
@@ -719,6 +806,7 @@ static void non_max_supp(short* mag, short* gradx, short* grady, int cols,
 
         result[colcount] = !(mag1 | mag2);
     }
+
     result[cols - 2] = NOEDGE;
     result[cols - 1] = NOEDGE;
 }
