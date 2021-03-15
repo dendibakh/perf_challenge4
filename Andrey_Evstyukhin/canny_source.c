@@ -373,11 +373,15 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
       }
 
       for(c=center;c<cols-center;c++){
-         dot = 0.0;
-         for(cc=(-center);cc<=center;cc++){
-               dot += (float)image[r*cols+(c+cc)] * kernel[center+cc];
+         doty[c] = 0.0;
+      }
+      for(cc=(-center);cc<=center;cc++){
+         for(c=center;c<cols-center;c++){
+            doty[c] += (float)image[r*cols+(c+cc)] * kernel[center+cc];
          }
-         tempim[r*cols+c] = dot;
+      }
+      for(c=center;c<cols-center;c++){
+         tempim[r*cols+c] = doty[c];
       }
 
       for(c=cols-center;c<cols;c++){
@@ -484,7 +488,7 @@ void apply_hysteresis(short int *mag, int rows, int cols,
 {
    const int delta[8] = { -1, 1, -1 - cols, 0 - cols, 1 - cols, -1 + cols, 0 + cols, 1 + cols };
 
-   int r, c, pos, numedges, highcount, lowthreshold, highthreshold,
+   int r, pos, numedges, highcount, lowthreshold, highthreshold,
        hist[32768];
    int *poses, *poses_write, e, m, f, i;
    int maximum_mag;
