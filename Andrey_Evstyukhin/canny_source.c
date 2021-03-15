@@ -428,8 +428,8 @@ void gaussian_smooth_derivative_magnitude_nms(unsigned char *image, int rows, in
 *******************************************************************************/
 void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
 {
-   int i, center;
-   float x, fx, sum=0;
+   int i, center, j=0;
+   float x, fx, sum=0, esum=0;
 
    center = ceil(2.5 * sigma);
    *windowsize = center + 1 + center;
@@ -445,6 +445,20 @@ void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
       fx = pow(2.71828, -0.5*x*x/(sigma*sigma)) / (sigma * sqrt(6.2831853));
       (*kernel)[i] = fx;
       sum += fx;
+   }
+
+   for(i=0;i<center;i++){
+      fx = (*kernel)[i];
+      if ((esum + fx) * (2 * 255*2) >= sum) {
+         j = i;
+         break;
+      }
+      esum += fx;
+   }
+   if (j > 0) {
+      sum -= esum + esum;
+      for(i=j;i<(*windowsize)-j;i++) (*kernel)[i-j] = (*kernel)[i];
+      (*windowsize) -= j + j;
    }
 
    for(i=0;i<(*windowsize);i++) (*kernel)[i] /= sum;
