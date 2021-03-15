@@ -431,7 +431,7 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
       center;            /* Half of the windowsize. */
    float *tempim,        /* Buffer for separable filter gaussian smoothing. */
          *kernel,        /* A one dimensional gaussian kernel. */
-         dot,            /* Dot product summing variable. */
+         dot, *doty,     /* Dot product summing variable. */
          sum;            /* Sum of the kernel weights variable. */
 
    /****************************************************************************
@@ -446,6 +446,10 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    ****************************************************************************/
    if((tempim = (float *) calloc(rows*cols, sizeof(float))) == NULL){
       fprintf(stderr, "Error allocating the buffer image.\n");
+      exit(1);
+   }
+   if((doty = (float *) calloc(cols, sizeof(float))) == NULL){
+      fprintf(stderr, "Error allocating the row buffer.\n");
       exit(1);
    }
    if(((*smoothedim) = (short int *) calloc(rows*cols,
@@ -476,20 +480,31 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    * Blur in the y - direction.
    ****************************************************************************/
    if(VERBOSE) printf("   Bluring the image in the Y-direction.\n");
-   for(c=0;c<cols;c++){
       for(r=0;r<rows;r++){
-         sum = 0.0;
-         dot = 0.0;
+         for(c=0;c<cols;c++){
+             doty[c] = 0.0;
+         }
+
          for(rr=(-center);rr<=center;rr++){
             if(((r+rr) >= 0) && ((r+rr) < rows)){
-               dot += tempim[(r+rr)*cols+c] * kernel[center+rr];
+               for(c=0;c<cols;c++){
+                  doty[c] += tempim[(r+rr)*cols+c] * kernel[center+rr];
+               }
+            }
+         }
+
+         sum = 0.0;
+         for(rr=(-center);rr<=center;rr++){
+            if(((r+rr) >= 0) && ((r+rr) < rows)){
                sum += kernel[center+rr];
             }
          }
-         (*smoothedim)[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5);
+         for(c=0;c<cols;c++){
+            (*smoothedim)[r*cols+c] = (short int)(doty[c]*BOOSTBLURFACTOR/sum + 0.5);
+         }
       }
-   }
 
+   free(doty);
    free(tempim);
    free(kernel);
 }
