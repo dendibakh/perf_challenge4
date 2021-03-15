@@ -473,7 +473,8 @@ void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
 void apply_hysteresis(short int *mag, int rows, int cols,
 	float tlow, float thigh, unsigned char *edge)
 {
-   const int delta[8] = { -1, 1, -1 + cols, 0 + cols, 1 + cols, -1 - cols, 0 - cols, 1 - cols };
+   const int delta[8 + 1] = { -1, 1, -1 + cols, 0 + cols, 1 + cols, -1 - cols, 0 - cols, 1 - cols,
+       (-1 - cols) * 5 };
 
    int r, pos, numedges, highcount,
        hist[32768];
@@ -608,6 +609,11 @@ void apply_hysteresis(short int *mag, int rows, int cols,
 
    while (poses_write != poses) {
        r = *--poses_write;
+
+#if USE_INTRINSICS
+       pos = delta[8] + r;
+       _mm_prefetch((const char*)&edge[max(0, pos)], _MM_HINT_T1);
+#endif
 
        for (i = 0; i < 8; i++) {
            pos = delta[i] + r;
