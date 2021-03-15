@@ -68,11 +68,9 @@ int write_pgm_image(char *outfilename, unsigned char *image, int rows,
 
 void canny(unsigned char *image, int rows, int cols, float sigma,
          float tlow, float thigh, unsigned char **edge, char *fname);
-void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
-        short int **smoothedim);
+void gaussian_smooth_derivative(unsigned char *image, int rows, int cols, float sigma,
+    short int* delta_x, short int* delta_y);
 void make_gaussian_kernel(float sigma, float **kernel, int *windowsize);
-void derrivative_x_y(short int *smoothedim, int rows, int cols,
-        short int **delta_x, short int **delta_y);
 void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
         short int **magnitude);
 void apply_hysteresis(short int *mag, int rows, int cols,
@@ -170,8 +168,7 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
          float tlow, float thigh, unsigned char **edge, char *fname)
 {
    unsigned char *nms;        /* Points that are local maximal magnitude. */
-   short int *smoothedim,     /* The image after gaussian smoothing.      */
-             *delta_x,        /* The first devivative image, x-direction. */
+   short int *delta_x,        /* The first devivative image, x-direction. */
              *delta_y,        /* The first derivative image, y-direction. */
              *magnitude;      /* The magnitude of the gadient image.      */
 
@@ -179,14 +176,17 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
    * Perform gaussian smoothing on the image using the input standard
    * deviation.
    ****************************************************************************/
-   if(VERBOSE) printf("Smoothing the image using a gaussian kernel.\n");
-   gaussian_smooth(image, rows, cols, sigma, &smoothedim);
+   if (VERBOSE) printf("Smoothing the image using a gaussian kernel.\n");
+   if ((delta_x = (short*)malloc(sizeof(short) * rows * cols)) == NULL) {
+       fprintf(stderr, "Error allocating the delta_x image.\n");
+       exit(1);
+   }
+   if ((delta_y = (short*)malloc(sizeof(short) * rows * cols)) == NULL) {
+       fprintf(stderr, "Error allocating the delta_y image.\n");
+       exit(1);
+   }
 
-   /****************************************************************************
-   * Compute the first derivative in the x and y directions.
-   ****************************************************************************/
-   if(VERBOSE) printf("Computing the X and Y first derivatives.\n");
-   derrivative_x_y(smoothedim, rows, cols, &delta_x, &delta_y);
+   gaussian_smooth_derivative(image, rows, cols, sigma, delta_x, delta_y);
 
    /****************************************************************************
    * Compute the magnitude of the gradient.
@@ -217,10 +217,9 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
    * Free all of the memory that we allocated except for the edge image that
    * is still being used to store out result.
    ****************************************************************************/
-   free(smoothedim);
-   free(delta_x);
-   free(delta_y);
    free(magnitude);
+   free(delta_y);
+   free(delta_x);
 }
 
 /*******************************************************************************
@@ -254,90 +253,22 @@ void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
 }
 
 /*******************************************************************************
-* PROCEDURE: derrivative_x_y
-* PURPOSE: Compute the first derivative of the image in both the x any y
-* directions. The differential filters that are used are:
-*
-*                                          -1
-*         dx =  -1 0 +1     and       dy =  0
-*                                          +1
-*
-* NAME: Mike Heath
-* DATE: 2/15/96
-*******************************************************************************/
-void derrivative_x_y(short int *smoothedim, int rows, int cols,
-        short int **delta_x, short int **delta_y)
-{
-   int r, c, pos;
-   short* dx;
-   short* dy;
-
-   /****************************************************************************
-   * Allocate images to store the derivatives.
-   ****************************************************************************/
-   if(((*delta_x) = (short *) malloc(sizeof(short)*rows*cols)) == NULL){
-      fprintf(stderr, "Error allocating the delta_x image.\n");
-      exit(1);
-   }
-   if(((*delta_y) = (short *) malloc(sizeof(short)*rows*cols)) == NULL){
-      fprintf(stderr, "Error allocating the delta_x image.\n");
-      exit(1);
-   }
-
-   /****************************************************************************
-   * Compute the x-derivative. Adjust the derivative at the borders to avoid
-   * losing pixels.
-   ****************************************************************************/
-   if(VERBOSE) printf("   Computing the X-direction derivative.\n");
-   dx = *delta_x;
-   pos = 0;
-   for(r=0;r<rows;r++){
-      dx[pos] = smoothedim[pos+1] - smoothedim[pos];
-      pos++;
-      for(c=1;c<(cols-1);c++,pos++){
-         dx[pos] = smoothedim[pos+1] - smoothedim[pos-1];
-      }
-      dx[pos] = smoothedim[pos] - smoothedim[pos-1];
-      pos++;
-   }
-
-   /****************************************************************************
-   * Compute the y-derivative. Adjust the derivative at the borders to avoid
-   * losing pixels.
-   ****************************************************************************/
-   if(VERBOSE) printf("   Computing the Y-direction derivative.\n");
-      dy = *delta_y;
-      pos = 0;
-      for(c=0;c<cols;c++,pos++){
-      dy[pos] = smoothedim[pos+cols] - smoothedim[pos];
-      }
-      for(r=1;r<(rows-1);r++){
-         for(c=0;c<cols;c++,pos++){
-         dy[pos] = smoothedim[pos+cols] - smoothedim[pos-cols];
-         }
-      }
-      for(c=0;c<cols;c++,pos++){
-      dy[pos] = smoothedim[pos] - smoothedim[pos-cols];
-   }
-}
-
-/*******************************************************************************
 * PROCEDURE: gaussian_smooth
 * PURPOSE: Blur an image with a gaussian filter.
 * NAME: Mike Heath
 * DATE: 2/15/96
 *******************************************************************************/
-void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
-        short int **smoothedim)
+void gaussian_smooth_derivative(unsigned char *image, int rows, int cols, float sigma,
+        short int* delta_x, short int* delta_y)
 {
-   int r, c, rr, cc,     /* Counter variables. */
+   int r, c, rr, cc, pos,/* Counter variables. */
       windowsize,        /* Dimension of the gaussian kernel. */
       center;            /* Half of the windowsize. */
-   float *tempim,        /* Buffer for separable filter gaussian smoothing. */
-         *kernel,        /* A one dimensional gaussian kernel. */
-         dot, *doty,     /* Dot product summing variable. */
-         sum;            /* Sum of the kernel weights variable. */
+   float *kernel,        /* A one dimensional gaussian kernel. */
+         dot, *doty, *dotx, /* Dot product summing variable. */
+         sum, k;         /* Sum of the kernel weights variable. */
    double scale;
+   short int *z2, *z1, *z0, *swap;
 
    /****************************************************************************
    * Create a 1-dimensional gaussian smoothing kernel.
@@ -349,88 +280,134 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    /****************************************************************************
    * Allocate a temporary buffer image and the smoothed image.
    ****************************************************************************/
-   if((tempim = (float *) malloc(sizeof(float)*rows*cols)) == NULL){
-      fprintf(stderr, "Error allocating the buffer image.\n");
-      exit(1);
-   }
    if((doty = (float *) malloc(sizeof(float)*cols)) == NULL){
       fprintf(stderr, "Error allocating the row buffer.\n");
       exit(1);
    }
-   if(((*smoothedim) = (short int *) malloc(sizeof(short int)*rows*cols)) == NULL){
-      fprintf(stderr, "Error allocating the smoothed image.\n");
+   if((dotx = (float *) malloc(sizeof(float)*cols)) == NULL){
+      fprintf(stderr, "Error allocating the row buffer.\n");
+      exit(1);
+   }
+   if((z2 = (short *) malloc(sizeof(short)*cols)) == NULL){
+      fprintf(stderr, "Error allocating the row buffer.\n");
+      exit(1);
+   }
+   if((z1 = (short *) malloc(sizeof(short)*cols)) == NULL){
+      fprintf(stderr, "Error allocating the row buffer.\n");
+      exit(1);
+   }
+   if((z0 = (short *) malloc(sizeof(short)*cols)) == NULL){
+      fprintf(stderr, "Error allocating the row buffer.\n");
       exit(1);
    }
 
-   /****************************************************************************
-   * Blur in the x - direction.
-   ****************************************************************************/
-   if(VERBOSE) printf("   Bluring the image in the X-direction.\n");
-   for(r=0;r<rows;r++){
+   if(VERBOSE) printf("   Bluring the image.\n");
+      for(r=0;r<rows;r++){
+         /****************************************************************************
+         * Blur in the y - direction.
+         ****************************************************************************/
+         sum = 0.0f;
+         rr = max(-r, -center);
+         {
+               k = kernel[center + rr];
+               pos = (r+rr)*cols;
+               for(c=0;c<cols;c++){
+                  doty[c] = (float)image[pos+c] * k;
+               }
+               sum += k;
+         }
+         while (++rr <= min(center,rows-1-r)) {
+               k = kernel[center + rr];
+               pos = (r+rr)*cols;
+               for(c=0;c<cols;c++){
+                  doty[c] += (float)image[pos+c] * k;
+               }
+               sum += k;
+         }
+
+         scale = BOOSTBLURFACTOR/sum;
+
+      /****************************************************************************
+      * Blur in the x - direction.
+      ****************************************************************************/
       for(c=0;c<center;c++){
-         dot = 0.0;
-         sum = 0.0;
+         dot = 0.0f;
+         sum = 0.0f;
          for(cc=-c;cc<=center;cc++){
-               dot += (float)image[r*cols+(c+cc)] * kernel[center+cc];
+               dot += doty[c+cc] * kernel[center+cc];
                sum += kernel[center+cc];
          }
-         tempim[r*cols+c] = dot/sum;
+         z0[c] = (short int)(dot/sum*scale + 0.5);
       }
 
-      for(c=center;c<cols-center;c++){
-         doty[c] = 0.0;
-      }
-      for(cc=(-center);cc<=center;cc++){
+      cc = -center;
+      {
+         k = kernel[center + cc];
          for(c=center;c<cols-center;c++){
-            doty[c] += (float)image[r*cols+(c+cc)] * kernel[center+cc];
+            dotx[c] = doty[c+cc] * k;
          }
       }
-      for(c=center;c<cols-center;c++){
-         tempim[r*cols+c] = doty[c];
+      while (++cc < center){
+         k = kernel[center + cc];
+         for(c=center;c<cols-center;c++){
+            dotx[c] += doty[c+cc] * k;
+         }
+      }
+      {
+         k = kernel[center + cc];
+         for(c=center;c<cols-center;c++){
+            float dotz = doty[c+cc] * k + dotx[c];
+            z0[c] = (short int)(dotz*scale + 0.5);
+         }
       }
 
       for(c=cols-center;c<cols;c++){
-         dot = 0.0;
-         sum = 0.0;
+         dot = 0.0f;
+         sum = 0.0f;
          for(cc=-center;cc<=cols-c;cc++){
-               dot += (float)image[r*cols+(c+cc)] * kernel[center+cc];
+               dot += doty[c+cc] * kernel[center+cc];
                sum += kernel[center+cc];
          }
-         tempim[r*cols+c] = dot/sum;
+         z0[c] = (short int)(dot/sum*scale + 0.5);
       }
+
+      /****************************************************************************
+      * Compute the x-derivative. Adjust the derivative at the borders to avoid
+      * losing pixels.
+      ****************************************************************************/
+      pos = r * cols;
+      delta_x[pos] = z0[1] - z0[0];
+      pos++;
+      for (c = 2; c < cols; c++, pos++) {
+          delta_x[pos] = z0[c] - z0[c - 2];
+      }
+      delta_x[pos] = z0[cols - 1] - z0[cols - 2];
+
+      /****************************************************************************
+      * Compute the y-derivative. Adjust the derivative at the borders to avoid
+      * losing pixels.
+      ****************************************************************************/
+      if (r) {
+          pos = (r - 1) * cols;
+          swap = (r == 1) ? z1 : z2;
+          for (c = 0; c < cols; c++, pos++) {
+              delta_y[pos] = z0[c] - swap[c];
+          }
+      }
+
+      swap = z2; z2 = z1; z1 = z0; z0 = swap;
    }
 
-   /****************************************************************************
-   * Blur in the y - direction.
-   ****************************************************************************/
-   if(VERBOSE) printf("   Bluring the image in the Y-direction.\n");
-      for(r=0;r<rows;r++){
-         for(c=0;c<cols;c++){
-             doty[c] = 0.0;
-         }
+   pos = (rows - 1) * cols;
+   for (c = 0; c < cols; c++, pos++) {
+       delta_y[pos] = z1[c] - z2[c];
+   }
 
-         for(rr=(-center);rr<=center;rr++){
-            if(((r+rr) >= 0) && ((r+rr) < rows)){
-               for(c=0;c<cols;c++){
-                  doty[c] += tempim[(r+rr)*cols+c] * kernel[center+rr];
-               }
-            }
-         }
-
-         sum = 0.0;
-         for(rr=(-center);rr<=center;rr++){
-            if(((r+rr) >= 0) && ((r+rr) < rows)){
-               sum += kernel[center+rr];
-            }
-         }
-         scale = BOOSTBLURFACTOR/sum;
-         for(c=0;c<cols;c++){
-            (*smoothedim)[r*cols+c] = (short int)(doty[c]*scale + 0.5);
-         }
-      }
-
+   free(z0);
+   free(z1);
+   free(z2);
+   free(dotx);
    free(doty);
-   free(tempim);
    free(kernel);
 }
 
