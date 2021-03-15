@@ -473,7 +473,7 @@ void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
 void apply_hysteresis(short int *mag, int rows, int cols,
 	float tlow, float thigh, unsigned char *edge)
 {
-   const int delta[8] = { -1, 1, -1 - cols, 0 - cols, 1 - cols, -1 + cols, 0 + cols, 1 + cols };
+   const int delta[8] = { -1, 1, -1 + cols, 0 + cols, 1 + cols, -1 - cols, 0 - cols, 1 - cols };
 
    int r, pos, numedges, highcount,
        hist[32768];
@@ -541,6 +541,58 @@ void apply_hysteresis(short int *mag, int rows, int cols,
 
    highthreshold--;
    lowthreshold = min(lowthreshold, highthreshold);
+
+#if USE_INTRINSICS
+   const __m128i mhighthreshold = _mm_broadcastw_epi16(_mm_cvtsi32_si128(highthreshold));
+   const __m128i mlowthreshold = _mm_broadcastw_epi16(_mm_cvtsi32_si128(lowthreshold));
+
+   const __m128i mnone = _mm_setzero_si128();
+
+   __m256i vc = _mm256_set_epi32(7, 6, 5, 4, 3, 2, 1, 0);
+   vc = _mm256_add_epi32(vc, _mm256_broadcastd_epi32(_mm_cvtsi32_si128(cols)));
+   const __m256i v8 = _mm256_set1_epi32(8);
+
+   poses_write = poses;
+   for (pos = cols, r = cols * (rows - 2); pos < r; pos += 8) {
+       __m128i mm = _mm_loadu_si128((const __m128i*)&mag[pos]);
+
+       __m128i me = _mm_loadl_epi64((const __m128i*)&edge[pos]);
+
+       __m128i mh = _mm_cmpgt_epi16(mm, mhighthreshold);
+       __m128i ml = _mm_cmpgt_epi16(mm, mlowthreshold);
+
+       mh = _mm_packs_epi16(mh, mnone);
+       ml = _mm_packs_epi16(ml, mnone);
+
+       mh = _mm_and_si128(mh, me);
+       ml = _mm_and_si128(ml, me);
+
+       me = _mm_add_epi16(ml, mh);
+
+       i = _mm_movemask_epi8(_mm_slli_epi16(mh, 7));
+
+       _mm_storel_epi64((__m128i*)&edge[pos], me);
+
+       {
+           unsigned long long positions = _pdep_u64(i, 0x0101010101010101uLL) * 0xFF;
+
+           unsigned long long idx = _pext_u64(0x0706050403020100uLL, positions);
+
+           __m128i midx = _mm_cvtsi64_si128((long long)idx);
+
+           __m256i vidx = _mm256_cvtepu8_epi32(midx);
+
+           __m256i vdata = _mm256_permutevar8x32_epi32(vc, vidx);
+
+           vc = _mm256_add_epi32(vc, v8);
+
+           int count = _mm_popcnt_u32(i);
+
+           _mm256_storeu_si256((__m256i*)poses_write, vdata);
+           poses_write += count;
+       }
+   }
+#else
    for (pos = cols, r = cols * (rows - 2); pos < r; pos++) {
        m = mag[pos];
        e = edge[pos];
@@ -552,6 +604,7 @@ void apply_hysteresis(short int *mag, int rows, int cols,
        *poses_write = pos;
        poses_write += (edge[pos] >> 1);
    }
+#endif
 
    while (poses_write != poses) {
        r = *--poses_write;
