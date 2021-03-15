@@ -709,198 +709,95 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
     unsigned char *result) 
 {
     int rowcount, colcount,count;
-    short *magrowptr,*magptr;
-    short *gxrowptr,*gxptr;
-    short *gyrowptr,*gyptr,z1,z2;
-    short m00,gx,gy;
-    float mag1,mag2,xperp,yperp;
-    unsigned char *resultrowptr, *resultptr;
+    short *magptr, *gxptr, *gyptr;
+    short z2L,z2,z2R,z1,m,z3,z4,z4L,z4R,zm;
+    int gx,gy,gm,negx,negy,negxy,swapg;
+    int mag1,mag2;
+    unsigned char *resultptr;
     
 
    /****************************************************************************
    * Zero the edges of the result image.
    ****************************************************************************/
-    for(count=0,resultrowptr=result,resultptr=result+ncols*(nrows-1); 
-        count<ncols; resultptr++,resultrowptr++,count++){
-        *resultrowptr = *resultptr = (unsigned char) 0;
+    for(count=0,resultptr=result; count<ncols; count++,resultptr++){
+        *resultptr = EDGE;
     }
 
-    for(count=0,resultptr=result,resultrowptr=result+ncols-1;
-        count<nrows; count++,resultptr+=ncols,resultrowptr+=ncols){
-        *resultptr = *resultrowptr = (unsigned char) 0;
+    for(count=0,resultptr=result+ncols*(nrows-1); count<ncols; count++,resultptr++) {
+        *resultptr = EDGE;
     }
 
    /****************************************************************************
    * Suppress non-maximum points.
    ****************************************************************************/
-   for(rowcount=1,magrowptr=mag+ncols+1,gxrowptr=gradx+ncols+1,
-      gyrowptr=grady+ncols+1,resultrowptr=result+ncols+1;
+   for(rowcount=1,magptr=mag+ncols,gxptr=gradx+ncols,
+      gyptr=grady+ncols,resultptr=result+ncols;
       rowcount<nrows-2; 
-      rowcount++,magrowptr+=ncols,gyrowptr+=ncols,gxrowptr+=ncols,
-      resultrowptr+=ncols){   
-      for(colcount=1,magptr=magrowptr,gxptr=gxrowptr,gyptr=gyrowptr,
-         resultptr=resultrowptr;colcount<ncols-2; 
-         colcount++,magptr++,gxptr++,gyptr++,resultptr++){   
-         m00 = *magptr;
-         if(m00 == 0){
-            *resultptr = (unsigned char) NOEDGE;
-         }
-         else{
-            xperp = -(gx = *gxptr)/((float)m00);
-            yperp = (gy = *gyptr)/((float)m00);
-         }
+      rowcount++,magptr+=ncols,gyptr+=ncols,gxptr+=ncols,
+      resultptr+=ncols){   
+      *resultptr = EDGE;
+      for(colcount=1;colcount<ncols-2;colcount++){   
+            z2L = magptr[colcount - ncols - 1];
+            z2 = magptr[colcount - ncols];
+            z2R = magptr[colcount - ncols + 1];
 
-         if(gx >= 0){
-            if(gy >= 0){
-                    if (gx >= gy)
-                    {  
-                        /* 111 */
-                        /* Left point */
-                        z1 = *(magptr - 1);
-                        z2 = *(magptr - ncols - 1);
+            z1 = magptr[colcount - 1];
+            m = magptr[colcount];
+            z3 = magptr[colcount + 1];
 
-                        mag1 = (m00 - z1)*xperp + (z2 - z1)*yperp;
-                        
-                        /* Right point */
-                        z1 = *(magptr + 1);
-                        z2 = *(magptr + ncols + 1);
+            z4L = magptr[colcount + ncols - 1];
+            z4 = magptr[colcount + ncols];
+            z4R = magptr[colcount + ncols + 1];
 
-                        mag2 = (m00 - z1)*xperp + (z2 - z1)*yperp;
-                    }
-                    else
-                    {    
-                        /* 110 */
-                        /* Left point */
-                        z1 = *(magptr - ncols);
-                        z2 = *(magptr - ncols - 1);
+            gx = gxptr[colcount];
+            gy = gyptr[colcount];
 
-                        mag1 = (z1 - z2)*xperp + (z1 - m00)*yperp;
+            negx = -(gx < 0);
+            gx = (gx < 0) ? -gx : gx;
 
-                        /* Right point */
-                        z1 = *(magptr + ncols);
-                        z2 = *(magptr + ncols + 1);
+            negy = -(gy < 0);
+            gy = (gy < 0) ? -gy : gy;
 
-                        mag2 = (z1 - z2)*xperp + (z1 - m00)*yperp; 
-                    }
-                }
-                else
-                {
-                    if (gx >= -gy)
-                    {
-                        /* 101 */
-                        /* Left point */
-                        z1 = *(magptr - 1);
-                        z2 = *(magptr + ncols - 1);
+            swapg = -(gy > gx);
 
-                        mag1 = (m00 - z1)*xperp + (z1 - z2)*yperp;
-            
-                        /* Right point */
-                        z1 = *(magptr + 1);
-                        z2 = *(magptr - ncols + 1);
+            //
 
-                        mag2 = (m00 - z1)*xperp + (z1 - z2)*yperp;
-                    }
-                    else
-                    {    
-                        /* 100 */
-                        /* Left point */
-                        z1 = *(magptr + ncols);
-                        z2 = *(magptr + ncols - 1);
+            zm = (z1 ^ z3) & negx;
+            z1 ^= zm;
+            z3 ^= zm;
 
-                        mag1 = (z1 - z2)*xperp + (m00 - z1)*yperp;
+            zm = (z2 ^ z4) & negy;
+            z2 ^= zm;
+            z4 ^= zm;
 
-                        /* Right point */
-                        z1 = *(magptr - ncols);
-                        z2 = *(magptr - ncols + 1);
+            z1 = swapg ? z2 : z1;
+            z3 = swapg ? z4 : z3;
 
-                        mag2 = (z1 - z2)*xperp  + (m00 - z1)*yperp; 
-                    }
-                }
-            }
-            else
-            {
-                if ((gy = *gyptr) >= 0)
-                {
-                    if (-gx >= gy)
-                    {          
-                        /* 011 */
-                        /* Left point */
-                        z1 = *(magptr + 1);
-                        z2 = *(magptr - ncols + 1);
+            //
 
-                        mag1 = (z1 - m00)*xperp + (z2 - z1)*yperp;
+            negxy = negx ^ negy;
 
-                        /* Right point */
-                        z1 = *(magptr - 1);
-                        z2 = *(magptr + ncols - 1);
+            z2 = negxy ? z2R : z2L;
+            z4 = negxy ? z4L : z4R;
 
-                        mag2 = (z1 - m00)*xperp + (z2 - z1)*yperp;
-                    }
-                    else
-                    {
-                        /* 010 */
-                        /* Left point */
-                        z1 = *(magptr - ncols);
-                        z2 = *(magptr - ncols + 1);
+            zm = (z2 ^ z4) & negy;
+            z2 ^= zm;
+            z4 ^= zm;
 
-                        mag1 = (z2 - z1)*xperp + (z1 - m00)*yperp;
+            //
 
-                        /* Right point */
-                        z1 = *(magptr + ncols);
-                        z2 = *(magptr + ncols - 1);
+            gm = (gx ^ gy) & swapg;
+            gx ^= gm;
+            gy ^= gm;
 
-                        mag2 = (z2 - z1)*xperp + (z1 - m00)*yperp;
-                    }
-                }
-                else
-                {
-                    if (-gx > -gy)
-                    {
-                        /* 001 */
-                        /* Left point */
-                        z1 = *(magptr + 1);
-                        z2 = *(magptr + ncols + 1);
-
-                        mag1 = (z1 - m00)*xperp + (z1 - z2)*yperp;
-
-                        /* Right point */
-                        z1 = *(magptr - 1);
-                        z2 = *(magptr - ncols - 1);
-
-                        mag2 = (z1 - m00)*xperp + (z1 - z2)*yperp;
-                    }
-                    else
-                    {
-                        /* 000 */
-                        /* Left point */
-                        z1 = *(magptr + ncols);
-                        z2 = *(magptr + ncols + 1);
-
-                        mag1 = (z2 - z1)*xperp + (m00 - z1)*yperp;
-
-                        /* Right point */
-                        z1 = *(magptr - ncols);
-                        z2 = *(magptr - ncols - 1);
-
-                        mag2 = (z2 - z1)*xperp + (m00 - z1)*yperp;
-                    }
-                }
-            } 
+            mag1 = (z2 - z1)*gy > (m - z1)*gx;
+            mag2 = (z4 - z3)*gy >= (m - z3)*gx;
 
             /* Now determine if the current point is a maximum point */
 
-            if ((mag1 > 0.0) || (mag2 > 0.0))
-            {
-                *resultptr = (unsigned char) NOEDGE;
-            }
-            else
-            {    
-                if (mag2 == 0.0)
-                    *resultptr = (unsigned char) NOEDGE;
-                else
-                    *resultptr = (unsigned char) POSSIBLE_EDGE;
-            }
-        } 
+            resultptr[colcount] = (mag1 | mag2) ? (unsigned char)NOEDGE : (unsigned char)POSSIBLE_EDGE;
+      } 
+      resultptr[ncols - 1] = EDGE;
     }
 }
 /*******************************************************************************
