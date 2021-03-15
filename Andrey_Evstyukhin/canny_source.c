@@ -61,7 +61,7 @@
 #define USE_INTRINSICS 1
 
 #define VERBOSE 0
-#define BOOSTBLURFACTOR 90.0
+#define BOOSTBLURFACTOR 90
 
 #define NOEDGE 0
 #define POSSIBLE_EDGE 1
@@ -214,7 +214,7 @@ void gaussian_smooth_derivative_magnitude_nms(unsigned char *image, int rows, in
    float *kernel,        /* A one dimensional gaussian kernel. */
          dot, *doty, *dotx, /* Dot product summing variable. */
          sum, k;         /* Sum of the kernel weights variable. */
-   double scale;
+   float scale;
    short int *z0, *z1, *z2, *x0, *x1, *x2, *y1, *y2, *swap;
 #if !USE_INTRINSICS
    int dx, dy;
@@ -257,7 +257,7 @@ void gaussian_smooth_derivative_magnitude_nms(unsigned char *image, int rows, in
          /****************************************************************************
          * Blur in the y - direction.
          ****************************************************************************/
-         sum = 0.0f;
+         sum = 0;
          rr = max(-r, -center);
          {
                k = kernel[center + rr];
@@ -282,13 +282,13 @@ void gaussian_smooth_derivative_magnitude_nms(unsigned char *image, int rows, in
       * Blur in the x - direction.
       ****************************************************************************/
       for(c=0;c<center;c++){
-         dot = 0.0f;
-         sum = 0.0f;
+         dot = 0;
+         sum = 0;
          for(cc=-c;cc<=center;cc++){
                dot += doty[c+cc] * kernel[center+cc];
                sum += kernel[center+cc];
          }
-         z0[c] = (short int)(dot/sum*scale + 0.5);
+         z0[c] = (short int)(dot/sum*scale + 0.5f);
       }
 
       cc = -center;
@@ -308,18 +308,18 @@ void gaussian_smooth_derivative_magnitude_nms(unsigned char *image, int rows, in
          k = kernel[center + cc];
          for(c=center;c<cols-center;c++){
             float dotz = doty[c+cc] * k + dotx[c];
-            z0[c] = (short int)(dotz*scale + 0.5);
+            z0[c] = (short int)(dotz*scale + 0.5f);
          }
       }
 
       for(c=cols-center;c<cols;c++){
-         dot = 0.0f;
-         sum = 0.0f;
+         dot = 0;
+         sum = 0;
          for(cc=-center;cc<=cols-c;cc++){
                dot += doty[c+cc] * kernel[center+cc];
                sum += kernel[center+cc];
          }
-         z0[c] = (short int)(dot/sum*scale + 0.5);
+         z0[c] = (short int)(dot/sum*scale + 0.5f);
       }
 
       /****************************************************************************
@@ -429,10 +429,10 @@ void gaussian_smooth_derivative_magnitude_nms(unsigned char *image, int rows, in
 void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
 {
    int i, center;
-   float x, fx, sum=0.0;
+   float x, fx, sum=0;
 
-   *windowsize = 1 + 2 * ceil(2.5 * sigma);
-   center = (*windowsize) / 2;
+   center = ceil(2.5 * sigma);
+   *windowsize = center + 1 + center;
 
    if(VERBOSE) printf("      The kernel has %d elements.\n", *windowsize);
    if((*kernel = (float *) malloc((*windowsize) * sizeof(float))) == NULL){
