@@ -55,8 +55,8 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <stdlib.h>
-#define _USE_MATH_DEFINES
 #include <math.h>
+#include <intrin.h>
 
 #define VERBOSE 0
 #define BOOSTBLURFACTOR 90.0
@@ -68,11 +68,9 @@ int write_pgm_image(char *outfilename, unsigned char *image, int rows,
 
 void canny(unsigned char *image, int rows, int cols, float sigma,
          float tlow, float thigh, unsigned char **edge, char *fname);
-void gaussian_smooth_derivative(unsigned char *image, int rows, int cols, float sigma,
-    short int* delta_x, short int* delta_y);
+void gaussian_smooth_derivative_magnitude(unsigned char *image, int rows, int cols, float sigma,
+    short int* delta_x, short int* delta_y, short int* magnitude);
 void make_gaussian_kernel(float sigma, float **kernel, int *windowsize);
-void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
-        short int **magnitude);
 void apply_hysteresis(short int *mag, int rows, int cols,
         float tlow, float thigh, unsigned char *edge);
 void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
@@ -167,16 +165,10 @@ int main(int argc, char *argv[])
 void canny(unsigned char *image, int rows, int cols, float sigma,
          float tlow, float thigh, unsigned char **edge, char *fname)
 {
-   unsigned char *nms;        /* Points that are local maximal magnitude. */
    short int *delta_x,        /* The first devivative image, x-direction. */
              *delta_y,        /* The first derivative image, y-direction. */
              *magnitude;      /* The magnitude of the gadient image.      */
 
-   /****************************************************************************
-   * Perform gaussian smoothing on the image using the input standard
-   * deviation.
-   ****************************************************************************/
-   if (VERBOSE) printf("Smoothing the image using a gaussian kernel.\n");
    if ((delta_x = (short*)malloc(sizeof(short) * rows * cols)) == NULL) {
        fprintf(stderr, "Error allocating the delta_x image.\n");
        exit(1);
@@ -185,31 +177,35 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
        fprintf(stderr, "Error allocating the delta_y image.\n");
        exit(1);
    }
-
-   gaussian_smooth_derivative(image, rows, cols, sigma, delta_x, delta_y);
+   if ((magnitude = (short*)malloc(sizeof(short) * rows * cols)) == NULL) {
+       fprintf(stderr, "Error allocating the magnitude image.\n");
+       exit(1);
+   }
+   if ((*edge = (unsigned char*)malloc(sizeof(unsigned char) * rows * cols)) == NULL) {
+       fprintf(stderr, "Error allocating the edge image.\n");
+       exit(1);
+   }
 
    /****************************************************************************
-   * Compute the magnitude of the gradient.
+   * Perform gaussian smoothing on the image using the input standard
+   * deviation.
    ****************************************************************************/
-   if(VERBOSE) printf("Computing the magnitude of the gradient.\n");
-   magnitude_x_y(delta_x, delta_y, rows, cols, &magnitude);
+   if (VERBOSE) printf("Smoothing the image using a gaussian kernel.\n");
+
+   gaussian_smooth_derivative_magnitude(image, rows, cols, sigma,
+       delta_x, delta_y, magnitude);
 
    /****************************************************************************
    * Perform non-maximal suppression.
    ****************************************************************************/
    if(VERBOSE) printf("Doing the non-maximal suppression.\n");
-   if((nms = (unsigned char *) malloc(sizeof(unsigned char)*rows*cols))==NULL){
-      fprintf(stderr, "Error allocating the nms image.\n");
-      exit(1);
-   }
 
-   non_max_supp(magnitude, delta_x, delta_y, rows, cols, nms);
+   non_max_supp(magnitude, delta_x, delta_y, rows, cols, *edge);
 
    /****************************************************************************
    * Use hysteresis to mark the edge pixels.
    ****************************************************************************/
    if(VERBOSE) printf("Doing hysteresis thresholding.\n");
-   *edge=nms;
 
    apply_hysteresis(magnitude, rows, cols, tlow, thigh, *edge);
 
@@ -223,43 +219,13 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
 }
 
 /*******************************************************************************
-* PROCEDURE: magnitude_x_y
-* PURPOSE: Compute the magnitude of the gradient. This is the square root of
-* the sum of the squared derivative values.
-* NAME: Mike Heath
-* DATE: 2/15/96
-*******************************************************************************/
-void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
-        short int **magnitude)
-{
-   int n, pos, dx, dy;
-   short* mag;
-
-   /****************************************************************************
-   * Allocate an image to store the magnitude of the gradient.
-   ****************************************************************************/
-   if((*magnitude = (short *) malloc(sizeof(short)*rows*cols)) == NULL){
-      fprintf(stderr, "Error allocating the magnitude image.\n");
-      exit(1);
-   }
-
-   mag = *magnitude;
-   for(pos=0,n=cols*rows;pos<n;pos++){
-         dx = delta_x[pos];
-         dy = delta_y[pos];
-         mag[pos] = (short)(0.5f + sqrtf(dx*dx + dy*dy));
-   }
-
-}
-
-/*******************************************************************************
 * PROCEDURE: gaussian_smooth
 * PURPOSE: Blur an image with a gaussian filter.
 * NAME: Mike Heath
 * DATE: 2/15/96
 *******************************************************************************/
-void gaussian_smooth_derivative(unsigned char *image, int rows, int cols, float sigma,
-        short int* delta_x, short int* delta_y)
+void gaussian_smooth_derivative_magnitude(unsigned char *image, int rows, int cols, float sigma,
+        short int* delta_x, short int* delta_y, short int* magnitude)
 {
    int r, c, rr, cc, pos,/* Counter variables. */
       windowsize,        /* Dimension of the gaussian kernel. */
@@ -269,6 +235,7 @@ void gaussian_smooth_derivative(unsigned char *image, int rows, int cols, float 
          sum, k;         /* Sum of the kernel weights variable. */
    double scale;
    short int *z2, *z1, *z0, *swap;
+   int dx, dy;
 
    /****************************************************************************
    * Create a 1-dimensional gaussian smoothing kernel.
@@ -393,14 +360,64 @@ void gaussian_smooth_derivative(unsigned char *image, int rows, int cols, float 
           for (c = 0; c < cols; c++, pos++) {
               delta_y[pos] = z0[c] - swap[c];
           }
+
+          /*******************************************************************************
+          * PURPOSE: Compute the magnitude of the gradient. This is the square root of
+          * the sum of the squared derivative values.
+          *******************************************************************************/
+          pos = (r - 1) * cols;
+          for (c = 15; c < cols; c += 16, pos += 16)
+          {
+              __m256i vdx = _mm256_loadu_si256((const __m256i*)&delta_x[pos]);
+              __m256i vdy = _mm256_loadu_si256((const __m256i*)&delta_y[pos]);
+
+              __m256i vd0 = _mm256_unpacklo_epi16(vdx, vdy);
+              __m256i vd1 = _mm256_unpackhi_epi16(vdx, vdy);
+
+              vd0 = _mm256_madd_epi16(vd0, vd0);
+              vd1 = _mm256_madd_epi16(vd1, vd1);
+
+              __m256 vf0 = _mm256_cvtepi32_ps(vd0);
+              __m256 vf1 = _mm256_cvtepi32_ps(vd1);
+
+              vf0 = _mm256_sqrt_ps(vf0);
+              vf1 = _mm256_sqrt_ps(vf1);
+
+              vd0 = _mm256_cvtps_epi32(vf0);
+              vd1 = _mm256_cvtps_epi32(vf1);
+
+              __m256i vmag = _mm256_packus_epi32(vd0, vd1);
+
+              _mm256_storeu_si256((__m256i*)&magnitude[pos], vmag);
+          }
+          for (c -= 15; c < cols; c++, pos++) {
+              dx = delta_x[pos];
+              dy = delta_y[pos];
+              magnitude[pos] = (short)(0.5f + sqrtf(dx * dx + dy * dy));
+          }
       }
 
       swap = z2; z2 = z1; z1 = z0; z0 = swap;
    }
 
+   /****************************************************************************
+   * Compute the y-derivative. Adjust the derivative at the borders to avoid
+   * losing pixels.
+   ****************************************************************************/
    pos = (rows - 1) * cols;
    for (c = 0; c < cols; c++, pos++) {
        delta_y[pos] = z1[c] - z2[c];
+   }
+
+   /*******************************************************************************
+   * PURPOSE: Compute the magnitude of the gradient. This is the square root of
+   * the sum of the squared derivative values.
+   *******************************************************************************/
+   pos = (rows - 1) * cols;
+   for (c = 0; c < cols; c++, pos++) {
+       dx = delta_x[pos];
+       dy = delta_y[pos];
+       magnitude[pos] = (short)(0.5f + sqrtf(dx * dx + dy * dy));
    }
 
    free(z0);
@@ -583,9 +600,9 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
 {
     int rowcount, colcount,count;
     short *magptr, *gxptr, *gyptr;
-    short z2L,z2,z2R,z1,m,z3,z4,z4L,z4R,zm;
-    int gx,gy,gm,negx,negy,negxy,swapg;
-    int mag1,mag2;
+    short z2L,z2,z2R,z1,m,z3,z4L,z4,z4R,zm;
+    short gx,gy,gm,negx,negy,negxy,swapg;
+    unsigned char mag1,mag2;
     unsigned char *resultptr;
     
 
@@ -658,8 +675,13 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
             gx ^= gm;
             gy ^= gm;
 
-            mag1 = (z2 - z1)*gy > (m - z1)*gx;
-            mag2 = (z4 - z3)*gy >= (m - z3)*gx;
+            z2 -= z1;
+            z4 -= z3;
+            z1 -= m;
+            z3 -= m;
+
+            mag1 = z2*gy + z1*gx > 0;
+            mag2 = z4*gy + z3*gx > -1;
 
             /* Now determine if the current point is a maximum point */
 
