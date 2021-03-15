@@ -233,7 +233,8 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
 void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
         short int **magnitude)
 {
-   int r, c, pos, sq1, sq2;
+   int n, pos, dx, dy;
+   short* mag;
 
    /****************************************************************************
    * Allocate an image to store the magnitude of the gradient.
@@ -243,12 +244,11 @@ void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
       exit(1);
    }
 
-   for(r=0,pos=0;r<rows;r++){
-      for(c=0;c<cols;c++,pos++){
-         sq1 = delta_x[pos];
-         sq2 = delta_y[pos];
-         (*magnitude)[pos] = (short)(0.5f + sqrtf(sq1*sq1 + sq2*sq2));
-      }
+   mag = *magnitude;
+   for(pos=0,n=cols*rows;pos<n;pos++){
+         dx = delta_x[pos];
+         dy = delta_y[pos];
+         mag[pos] = (short)(0.5f + sqrtf(dx*dx + dy*dy));
    }
 
 }
@@ -269,6 +269,8 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
         short int **delta_x, short int **delta_y)
 {
    int r, c, pos;
+   short* dx;
+   short* dy;
 
    /****************************************************************************
    * Allocate images to store the derivatives.
@@ -287,14 +289,16 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
    * losing pixels.
    ****************************************************************************/
    if(VERBOSE) printf("   Computing the X-direction derivative.\n");
+   dx = *delta_x;
+   pos = 0;
    for(r=0;r<rows;r++){
-      pos = r * cols;
-      (*delta_x)[pos] = smoothedim[pos+1] - smoothedim[pos];
+      dx[pos] = smoothedim[pos+1] - smoothedim[pos];
       pos++;
       for(c=1;c<(cols-1);c++,pos++){
-         (*delta_x)[pos] = smoothedim[pos+1] - smoothedim[pos-1];
+         dx[pos] = smoothedim[pos+1] - smoothedim[pos-1];
       }
-      (*delta_x)[pos] = smoothedim[pos] - smoothedim[pos-1];
+      dx[pos] = smoothedim[pos] - smoothedim[pos-1];
+      pos++;
    }
 
    /****************************************************************************
@@ -302,17 +306,18 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
    * losing pixels.
    ****************************************************************************/
    if(VERBOSE) printf("   Computing the Y-direction derivative.\n");
+      dy = *delta_y;
       pos = 0;
       for(c=0;c<cols;c++,pos++){
-      (*delta_y)[pos] = smoothedim[pos+cols] - smoothedim[pos];
+      dy[pos] = smoothedim[pos+cols] - smoothedim[pos];
       }
       for(r=1;r<(rows-1);r++){
          for(c=0;c<cols;c++,pos++){
-         (*delta_y)[pos] = smoothedim[pos+cols] - smoothedim[pos-cols];
+         dy[pos] = smoothedim[pos+cols] - smoothedim[pos-cols];
          }
       }
       for(c=0;c<cols;c++,pos++){
-      (*delta_y)[pos] = smoothedim[pos] - smoothedim[pos-cols];
+      dy[pos] = smoothedim[pos] - smoothedim[pos-cols];
    }
 }
 
