@@ -437,12 +437,14 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
       center;            /* Half of the windowsize. */
    float *tempim,        /* Buffer for separable filter gaussian smoothing. */
          *kernel,        /* A one dimensional gaussian kernel. */
-         dot,            /* Dot product summing variable. */
-         sum;            /* Sum of the kernel weights variable. */
+      dot,            /* Dot product summing variable. */
+      sum;            /* Sum of the kernel weights variable. */
+   float *dotsRow,       /* Row with intermediate results of dot products. */
+         *sumsRow;       /* Row with intermediate results of summations. */
 
-   /****************************************************************************
-   * Create a 1-dimensional gaussian smoothing kernel.
-   ****************************************************************************/
+/****************************************************************************
+* Create a 1-dimensional gaussian smoothing kernel.
+****************************************************************************/
    if(VERBOSE) printf("   Computing the gaussian smoothing kernel.\n");
    make_gaussian_kernel(sigma, &kernel, &windowsize);
    center = windowsize / 2;
@@ -455,8 +457,16 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
       exit(1);
    }
    if(((*smoothedim) = (short int *) calloc(rows*cols,
-         sizeof(short int))) == NULL){
+      sizeof(short int))) == NULL){
       fprintf(stderr, "Error allocating the smoothed image.\n");
+      exit(1);
+   }
+   if((dotsRow = (float*)calloc(cols, sizeof(float))) == NULL) {
+      fprintf(stderr, "Error allocating the row of dot products.\n");
+      exit(1);
+   }
+   if((sumsRow = (float*)calloc(cols, sizeof(float))) == NULL) {
+      fprintf(stderr, "Error allocating the row of summations.\n");
       exit(1);
    }
 
@@ -466,8 +476,8 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    if(VERBOSE) printf("   Bluring the image in the X-direction.\n");
    for(r=0;r<rows;r++){
       for(c=0;c<cols;c++){
-         dot = 0.0;
-         sum = 0.0;
+         dot = 0.0f;
+         sum = 0.0f;
          for(cc=(-center);cc<=center;cc++){
             if(((c+cc) >= 0) && ((c+cc) < cols)){
                dot += (float)image[r*cols+(c+cc)] * kernel[center+cc];
@@ -482,17 +492,26 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    * Blur in the y - direction.
    ****************************************************************************/
    if(VERBOSE) printf("   Bluring the image in the Y-direction.\n");
-   for(c=0;c<cols;c++){
-      for(r=0;r<rows;r++){
-         sum = 0.0;
-         dot = 0.0;
-         for(rr=(-center);rr<=center;rr++){
+   // Changes made:
+   // 1. loop interchange between rows and columns loops (effortless)
+   // 2. loop interchange between columns and "rr" loops:
+   //    a) dot products and summations are computed by rows and saved to
+   //       row buffers
+   //    b) then for each pixel in a row its value is computed and written,
+   //       and row buffers are being zeroed
+   for(r=0;r<rows;r++){
+      for(rr=(-center);rr<=center;rr++){
+         for(c=0;c<cols;c++){
             if(((r+rr) >= 0) && ((r+rr) < rows)){
-               dot += tempim[(r+rr)*cols+c] * kernel[center+rr];
-               sum += kernel[center+rr];
+               dotsRow[c] += tempim[(r+rr)*cols+c] * kernel[center+rr];
+               sumsRow[c] += kernel[center+rr];
             }
          }
-         (*smoothedim)[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5);
+      }
+      for(c=0;c<cols;c++){
+         (*smoothedim)[r*cols+c] = (short int)(dotsRow[c] * BOOSTBLURFACTOR / sumsRow[c] + 0.5f);
+         dotsRow[c] = 0.0f;
+         sumsRow[c] = 0.0f;
       }
    }
 
