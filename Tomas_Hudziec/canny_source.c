@@ -52,6 +52,12 @@
 *                     defined in radians counterclockwise from the x direction.
 *                     (Mike Heath)
 *******************************************************************************/
+
+/* to disable warnings about sprintf, sscanf, fopen (that they may be unsafe, and to use _s versions of them (e.g. sprintf_s)*/
+#ifdef _MSC_VER
+#define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #define _USE_MATH_DEFINES
@@ -121,9 +127,9 @@ int main(int argc, char *argv[])
    }
 
    infilename = argv[1];
-   sigma = atof(argv[2]);
-   tlow = atof(argv[3]);
-   thigh = atof(argv[4]);
+   sigma = (float)atof(argv[2]);
+   tlow = (float)atof(argv[3]);
+   thigh = (float)atof(argv[4]);
 
    if(argc == 6) dirfilename = infilename;
    else dirfilename = NULL;
@@ -177,7 +183,7 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
              *delta_x,        /* The first devivative image, x-direction. */
              *delta_y,        /* The first derivative image, y-direction. */
              *magnitude;      /* The magnitude of the gadient image.      */
-   int r, c, pos;
+   /*int r, c, pos;*/
    float *dir_radians=NULL;   /* Gradient direction image.                */
 
    /****************************************************************************
@@ -505,7 +511,7 @@ void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
    int i, center;
    float x, fx, sum=0.0;
 
-   *windowsize = 1 + 2 * ceil(2.5 * sigma);
+   *windowsize = 1 + 2 * (int)ceil(2.5 * sigma);
    center = (*windowsize) / 2;
 
    if(VERBOSE) printf("      The kernel has %d elements.\n", *windowsize);
@@ -516,7 +522,7 @@ void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
 
    for(i=0;i<(*windowsize);i++){
       x = (float)(i - center);
-      fx = pow(2.71828, -0.5*x*x/(sigma*sigma)) / (sigma * sqrt(6.2831853));
+      fx = (float)(pow(2.71828, -0.5*x*x/(sigma*sigma)) / (sigma * sqrt(6.2831853)));
       (*kernel)[i] = fx;
       sum += fx;
    }
@@ -559,7 +565,7 @@ void follow_edges(unsigned char *edgemapptr, short *edgemagptr, short lowval,
    short *tempmagptr;
    unsigned char *tempmapptr;
    int i;
-   float thethresh;
+   /*float thethresh;*/
    int x[8] = {1,1,0,-1,-1,-1,0,1},
        y[8] = {0,1,1,1,0,-1,-1,-1};
 
@@ -585,9 +591,9 @@ void follow_edges(unsigned char *edgemapptr, short *edgemagptr, short lowval,
 void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
 	float tlow, float thigh, unsigned char *edge)
 {
-   int r, c, pos, numedges, lowcount, highcount, lowthreshold, highthreshold,
-       i, hist[32768], rr, cc;
-   short int maximum_mag, sumpix;
+   int r, c, pos, numedges, /*lowcount,*/ highcount, lowthreshold, highthreshold,
+       /*i,*/ hist[32768]/*, rr, cc*/;
+   short int maximum_mag/*, sumpix*/;
 
    /****************************************************************************
    * Initialize the edge map to possible edges everywhere the non-maximal
