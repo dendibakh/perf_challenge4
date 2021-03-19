@@ -125,7 +125,7 @@ if runOnly or buildAndRun:
       if sys.platform != 'win32':      
         runCmd = "./canny " + inputFileName + " 0.5 0.7 0.9 2>&1"
       else:
-        runCmd = "canny.exe " + inputFileName + " 0.5 0.7 0.9"
+        runCmd = ".\\canny.exe " + inputFileName + " 0.5 0.7 0.9"
       valid = True
       try:
         subprocess.check_call(runCmd, shell=True, stdout=FNULL, stderr=FNULL)   
@@ -146,7 +146,7 @@ if runOnly or buildAndRun:
         if sys.platform != 'win32':            
           subprocess.check_call("./validate " + goldenFileName + " " + outputFileName, shell=True, stdout=FNULL, stderr=FNULL)
         else:
-          subprocess.check_call("validate.exe " + goldenFileName + " " + outputFileName, shell=True, stdout=FNULL, stderr=FNULL)          
+          subprocess.check_call(".\\validate.exe " + goldenFileName + " " + outputFileName, shell=True, stdout=FNULL, stderr=FNULL)          
       except:
         valid = False
      
