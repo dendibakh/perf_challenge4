@@ -43,7 +43,7 @@ if verbose:
   print ("Submissions:")
 
 for submission in os.listdir(os.getcwd()):
-  if not submission == ".git":
+  if not submission == ".git" and not submission == ".vs":
     if not os.path.isfile(os.path.join(os.getcwd(), submission)):
       submissions.append((submission, os.path.join(os.getcwd(), submission)))
       if verbose:
