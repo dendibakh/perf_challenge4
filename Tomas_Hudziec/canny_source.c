@@ -379,6 +379,7 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
         short int **delta_x, short int **delta_y)
 {
    int r, c, pos;
+   short* delta_y_row; /* row buffer for intermediate results */
 
    /****************************************************************************
    * Allocate images to store the derivatives.
@@ -388,7 +389,11 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
       exit(1);
    }
    if(((*delta_y) = (short *) calloc(rows*cols, sizeof(short))) == NULL){
-      fprintf(stderr, "Error allocating the delta_x image.\n");
+      fprintf(stderr, "Error allocating the delta_y image.\n");
+      exit(1);
+   }
+   if((delta_y_row = (short *) calloc(cols, sizeof(short))) == NULL){
+      fprintf(stderr, "Error allocating the delta_y row.\n");
       exit(1);
    }
 
@@ -412,14 +417,43 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
    * losing pixels.
    ****************************************************************************/
    if(VERBOSE) printf("   Computing the Y-direction derivative.\n");
+   // converted to walking by rows, and save intermediate results to row
+   // buffer like in gaussian_smooth function
+
+   // 1.row
+   r = 1;
    for(c=0;c<cols;c++){
-      pos = c;
-      (*delta_y)[pos] = smoothedim[pos+cols] - smoothedim[pos];
-      pos += cols;
-      for(r=1;r<(rows-1);r++,pos+=cols){
-         (*delta_y)[pos] = smoothedim[pos+cols] - smoothedim[pos-cols];
+      // save 2.row to intermediate buffer
+      delta_y_row[c] = smoothedim[r*cols+c];
+   }
+   r = 0;
+   for(c=0;c<cols;c++){
+      // subtract 1.row from 2. one and save to 1.
+      (*delta_y)[r*cols+c] = delta_y_row[c] - smoothedim[r*cols+c];
+   }
+
+   // middle rows
+   for(r=1;r<(rows-1);r++,pos+=cols){
+      for(c=0;c<cols;c++){
+         // save next row to intermediate buffer
+         delta_y_row[c] = smoothedim[(r+1)*cols+c];
       }
-      (*delta_y)[pos] = smoothedim[pos] - smoothedim[pos-cols];
+      for(c=0;c<cols;c++){
+         // subtract previous row and save to actual row
+         (*delta_y)[r*cols+c] = delta_y_row[c] - smoothedim[(r-1)*cols+c];
+      }
+   }
+
+   // last row
+   r = rows - 2;
+   for(c=0;c<cols;c++){
+      // save second-last row to intermediate buffer
+      delta_y_row[c] = smoothedim[r*cols+c];
+   }
+   r = rows - 1;
+   for(c=0;c<cols;c++){
+      // subtract second-last row from last one and save to last one
+      (*delta_y)[r*cols+c] = smoothedim[r*cols+c] - delta_y_row[c];
    }
 }
 
