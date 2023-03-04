@@ -10,7 +10,7 @@
 * permission may be granted only by Mike Heath or Prof. Sudeep Sarkar of
 * University of South Florida (sarkar@csee.usf.edu). Acknowledgment as
 * appropriate is respectfully requested.
-* 
+*
 *  Heath, M., Sarkar, S., Sanocki, T., and Bowyer, K. Comparison of edge
 *    detectors: a methodology and initial study, Computer Vision and Image
 *    Understanding 69 (1), 38-54, January 1998.
@@ -33,7 +33,7 @@
 * The user must input three parameters. These are as follows:
 *
 *   sigma = The standard deviation of the gaussian smoothing filter.
-*   tlow  = Specifies the low value to use in hysteresis. This is a 
+*   tlow  = Specifies the low value to use in hysteresis. This is a
 *           fraction (0-1) of the computed high threshold edge strength value.
 *   thigh = Specifies the high value to use in hysteresis. This fraction (0-1)
 *           specifies the percentage point in a histogram of the gradient of
@@ -52,13 +52,32 @@
 *                     defined in radians counterclockwise from the x direction.
 *                     (Mike Heath)
 *******************************************************************************/
+
+// Changes
+// 1. Replace calloc() calls with malloc().
+// 2. gaussian_smooth(): Loop interchange for Y-direction.
+// 3. apply_hysteresis(): Fusing edge set-up and histogram calculation.
+// 4. follow_edges(): Better locality through x, y reordering.
+// 5. non_max_supp(): Remove zeroing of edges
+// 6. non_max_supp(): Avoid unnecessary work if m00 is 0.
+// 7. gaussian_smooth(): Avoiding branch in innermost loop.
+// 8. Use float instead of double math.
+// 9. derrivative_x_y(): Loop interchange for Y-direction.
+// 10. magnitude_x_y() / apply_hysteresis(): Flattening nested loops.
+// 11. non_max_supp(): Simplifying iteration.
+// 12. Adding const and restrict on pointer arguments.
+// 13. apply_hysteresis(): Simplify setting edges at boundaries.
+// 14. gaussian_smooth(): Manually unrolling inner loops.
+// 15. apply_hysteresis(): Fusing edge calculation with edge set-up.
+
 #include <stdio.h>
 #include <stdlib.h>
 #define _USE_MATH_DEFINES
 #include <math.h>
+#include <string.h>
 
 #define VERBOSE 0
-#define BOOSTBLURFACTOR 90.0
+#define BOOSTBLURFACTOR 90.0f
 
 int read_pgm_image(char *infilename, unsigned char **image, int *rows,
     int *cols);
@@ -74,12 +93,12 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
         short int **delta_x, short int **delta_y);
 void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
         short int **magnitude);
-void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
+void apply_hysteresis(const short int *mag, const unsigned char *nms, int rows, int cols,
         float tlow, float thigh, unsigned char *edge);
 void radian_direction(short int *delta_x, short int *delta_y, int rows,
     int cols, float **dir_radians, int xdirtag, int ydirtag);
 double angle_radians(double x, double y);
-void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
+void non_max_supp(const short *mag, const short *gradx, const short *grady, int nrows, int ncols,
     unsigned char *result);
 
 int main(int argc, char *argv[])
@@ -177,7 +196,6 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
              *delta_x,        /* The first devivative image, x-direction. */
              *delta_y,        /* The first derivative image, y-direction. */
              *magnitude;      /* The magnitude of the gadient image.      */
-   int r, c, pos;
    float *dir_radians=NULL;   /* Gradient direction image.                */
 
    /****************************************************************************
@@ -227,7 +245,7 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
    * Perform non-maximal suppression.
    ****************************************************************************/
    if(VERBOSE) printf("Doing the non-maximal suppression.\n");
-   if((nms = (unsigned char *) calloc(rows*cols,sizeof(unsigned char)))==NULL){
+   if((nms = (unsigned char *) malloc(rows*cols*sizeof(unsigned char)))==NULL){
       fprintf(stderr, "Error allocating the nms image.\n");
       exit(1);
    }
@@ -238,7 +256,7 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
    * Use hysteresis to mark the edge pixels.
    ****************************************************************************/
    if(VERBOSE) printf("Doing hysteresis thresholding.\n");
-   if((*edge=(unsigned char *)calloc(rows*cols,sizeof(unsigned char))) ==NULL){
+   if((*edge=(unsigned char *)malloc(rows*cols*sizeof(unsigned char))) ==NULL){
       fprintf(stderr, "Error allocating the edge image.\n");
       exit(1);
    }
@@ -281,7 +299,7 @@ void radian_direction(short int *delta_x, short int *delta_y, int rows,
    /****************************************************************************
    * Allocate an image to store the direction of the gradient.
    ****************************************************************************/
-   if((dirim = (float *) calloc(rows*cols, sizeof(float))) == NULL){
+   if((dirim = (float *) malloc(rows*cols*sizeof(float))) == NULL){
       fprintf(stderr, "Error allocating the gradient direction image.\n");
       exit(1);
    }
@@ -334,27 +352,22 @@ double angle_radians(double x, double y)
 * NAME: Mike Heath
 * DATE: 2/15/96
 *******************************************************************************/
-void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
-        short int **magnitude)
+void magnitude_x_y(short int * restrict delta_x, short int * restrict delta_y, int rows, int cols,
+        short int ** restrict magnitude)
 {
-   int r, c, pos, sq1, sq2;
-
    /****************************************************************************
    * Allocate an image to store the magnitude of the gradient.
    ****************************************************************************/
-   if((*magnitude = (short *) calloc(rows*cols, sizeof(short))) == NULL){
+   if((*magnitude = (short *) malloc(rows*cols*sizeof(short))) == NULL){
       fprintf(stderr, "Error allocating the magnitude image.\n");
       exit(1);
    }
 
-   for(r=0,pos=0;r<rows;r++){
-      for(c=0;c<cols;c++,pos++){
-         sq1 = (int)delta_x[pos] * (int)delta_x[pos];
-         sq2 = (int)delta_y[pos] * (int)delta_y[pos];
-         (*magnitude)[pos] = (short)(0.5 + sqrt((float)sq1 + (float)sq2));
-      }
+   for(int pos=0;pos<rows*cols;++pos){
+      const int sq1 = (int)delta_x[pos] * (int)delta_x[pos];
+      const int sq2 = (int)delta_y[pos] * (int)delta_y[pos];
+      (*magnitude)[pos] = (short)(0.5f + sqrtf((float)sq1 + (float)sq2));
    }
-
 }
 
 /*******************************************************************************
@@ -369,19 +382,19 @@ void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
 * NAME: Mike Heath
 * DATE: 2/15/96
 *******************************************************************************/
-void derrivative_x_y(short int *smoothedim, int rows, int cols,
-        short int **delta_x, short int **delta_y)
+void derrivative_x_y(short int * restrict smoothedim, int rows, int cols,
+        short int ** restrict delta_x, short int ** restrict delta_y)
 {
-   int r, c, pos;
+   int r, c;
 
    /****************************************************************************
    * Allocate images to store the derivatives.
    ****************************************************************************/
-   if(((*delta_x) = (short *) calloc(rows*cols, sizeof(short))) == NULL){
+   if(((*delta_x) = (short *) malloc(rows*cols*sizeof(short))) == NULL){
       fprintf(stderr, "Error allocating the delta_x image.\n");
       exit(1);
    }
-   if(((*delta_y) = (short *) calloc(rows*cols, sizeof(short))) == NULL){
+   if(((*delta_y) = (short *) malloc(rows*cols*sizeof(short))) == NULL){
       fprintf(stderr, "Error allocating the delta_x image.\n");
       exit(1);
    }
@@ -392,13 +405,12 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
    ****************************************************************************/
    if(VERBOSE) printf("   Computing the X-direction derivative.\n");
    for(r=0;r<rows;r++){
-      pos = r * cols;
-      (*delta_x)[pos] = smoothedim[pos+1] - smoothedim[pos];
-      pos++;
-      for(c=1;c<(cols-1);c++,pos++){
-         (*delta_x)[pos] = smoothedim[pos+1] - smoothedim[pos-1];
+      c = 0;
+      (*delta_x)[r * cols + c] = smoothedim[r * cols + (c + 1)] - smoothedim[r * cols + c];
+      for(c=1;c<(cols-1);c++){
+         (*delta_x)[r * cols + c] = smoothedim[r * cols + (c + 1)] - smoothedim[r * cols + (c - 1)];
       }
-      (*delta_x)[pos] = smoothedim[pos] - smoothedim[pos-1];
+      (*delta_x)[r * cols + c] = smoothedim[r * cols + c] - smoothedim[r * cols + (c - 1)];
    }
 
    /****************************************************************************
@@ -406,14 +418,19 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
    * losing pixels.
    ****************************************************************************/
    if(VERBOSE) printf("   Computing the Y-direction derivative.\n");
+   /* do boundaries */
    for(c=0;c<cols;c++){
-      pos = c;
-      (*delta_y)[pos] = smoothedim[pos+cols] - smoothedim[pos];
-      pos += cols;
-      for(r=1;r<(rows-1);r++,pos+=cols){
-         (*delta_y)[pos] = smoothedim[pos+cols] - smoothedim[pos-cols];
+      r = 0;
+      (*delta_y)[r * cols + c] = smoothedim[(r + 1) * cols + c] - smoothedim[r * cols + c];
+      r = rows - 1;
+      (*delta_y)[r * cols + c] = smoothedim[r * cols + c] - smoothedim[(r - 1) * cols + c];
+   }
+
+   /* do inner */
+   for(r=1;r<(rows-1);r++){
+      for(c=0;c<cols;c++){
+         (*delta_y)[r * cols + c] = smoothedim[(r + 1) * cols + c] - smoothedim[(r - 1) * cols + c];
       }
-      (*delta_y)[pos] = smoothedim[pos] - smoothedim[pos-cols];
    }
 }
 
@@ -426,13 +443,11 @@ void derrivative_x_y(short int *smoothedim, int rows, int cols,
 void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
         short int **smoothedim)
 {
-   int r, c, rr, cc,     /* Counter variables. */
+   int r, c,             /* Counter variables. */
       windowsize,        /* Dimension of the gaussian kernel. */
       center;            /* Half of the windowsize. */
    float *tempim,        /* Buffer for separable filter gaussian smoothing. */
-         *kernel,        /* A one dimensional gaussian kernel. */
-         dot,            /* Dot product summing variable. */
-         sum;            /* Sum of the kernel weights variable. */
+         *kernel;        /* A one dimensional gaussian kernel. */
 
    /****************************************************************************
    * Create a 1-dimensional gaussian smoothing kernel.
@@ -444,12 +459,11 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    /****************************************************************************
    * Allocate a temporary buffer image and the smoothed image.
    ****************************************************************************/
-   if((tempim = (float *) calloc(rows*cols, sizeof(float))) == NULL){
+   if((tempim = (float *) malloc(rows*cols*sizeof(float))) == NULL){
       fprintf(stderr, "Error allocating the buffer image.\n");
       exit(1);
    }
-   if(((*smoothedim) = (short int *) calloc(rows*cols,
-         sizeof(short int))) == NULL){
+   if(((*smoothedim) = (short int *) malloc(rows*cols*sizeof(short int))) == NULL){
       fprintf(stderr, "Error allocating the smoothed image.\n");
       exit(1);
    }
@@ -460,33 +474,80 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    if(VERBOSE) printf("   Bluring the image in the X-direction.\n");
    for(r=0;r<rows;r++){
       for(c=0;c<cols;c++){
-         dot = 0.0;
-         sum = 0.0;
-         for(cc=(-center);cc<=center;cc++){
-            if(((c+cc) >= 0) && ((c+cc) < cols)){
-               dot += (float)image[r*cols+(c+cc)] * kernel[center+cc];
-               sum += kernel[center+cc];
-            }
+         float dot = 0.0f;
+         float sum = 0.0f;
+         const int first = (c - center) >= 0 ? -center : -c;
+         const int last = (c + center) < cols ? center : cols - c;
+         const int count = last - first;
+#define EMIT_LOOP(count)                                              \
+   for(int i = 0; i < (count); ++i){                                  \
+      const int offset = first + i;                                   \
+      dot += (float)image[r*cols+(c+offset)] * kernel[center+offset]; \
+      sum += kernel[center+offset];                                   \
+   }
+         switch(count)
+         {
+            case 4:
+#pragma clang loop unroll(full) vectorize(enable) interleave(enable)
+               EMIT_LOOP(4)
+               break;
+            case 3:
+#pragma clang loop unroll(full) vectorize(enable) interleave(enable)
+               EMIT_LOOP(3)
+               break;
+            case 2:
+#pragma clang loop unroll(full) vectorize(enable) interleave(enable)
+               EMIT_LOOP(2)
+               break;
+            default:
+               /* fallback */
+               /* printf("%s:%d: Add case for %d\n", __FUNCTION__, __LINE__, count); */
+               EMIT_LOOP(count)
+               break;
          }
          tempim[r*cols+c] = dot/sum;
       }
+#undef EMIT_LOOP
    }
 
    /****************************************************************************
    * Blur in the y - direction.
    ****************************************************************************/
    if(VERBOSE) printf("   Bluring the image in the Y-direction.\n");
-   for(c=0;c<cols;c++){
-      for(r=0;r<rows;r++){
-         sum = 0.0;
-         dot = 0.0;
-         for(rr=(-center);rr<=center;rr++){
-            if(((r+rr) >= 0) && ((r+rr) < rows)){
-               dot += tempim[(r+rr)*cols+c] * kernel[center+rr];
-               sum += kernel[center+rr];
-            }
+   for(r=0;r<rows;r++){
+      for(c=0;c<cols;c++){
+         float sum = 0.0f;
+         float dot = 0.0f;
+         const int first = (r - center) >= 0 ? -center : -r;
+         const int last = (r + center) < rows ? center : rows - r;
+         const int count = last - first;
+#define EMIT_LOOP(count)                                        \
+   for(int i = 0; i < (count); ++i){                            \
+      const int offset = first + i;                             \
+      dot += tempim[(r+offset)*cols+c] * kernel[center+offset]; \
+      sum += kernel[center+offset];                             \
+   }
+         switch (count)
+         {
+            case 4:
+#pragma clang loop unroll(full) vectorize(enable) interleave(enable)
+               EMIT_LOOP(4)
+               break;
+            case 3:
+#pragma clang loop unroll(full) vectorize(enable) interleave(enable)
+               EMIT_LOOP(3)
+               break;
+            case 2:
+#pragma clang loop unroll(full) vectorize(enable) interleave(enable)
+               EMIT_LOOP(2)
+               break;
+            default:
+               /* fallback */
+               /* printf("%s:%d: Add case for %d\n", __FUNCTION__, __LINE__, count); */
+               EMIT_LOOP(count)
+               break;
          }
-         (*smoothedim)[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5);
+         (*smoothedim)[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5f);
       }
    }
 
@@ -503,20 +564,20 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
 void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
 {
    int i, center;
-   float x, fx, sum=0.0;
+   float sum=0.0;
 
-   *windowsize = 1 + 2 * ceil(2.5 * sigma);
+   *windowsize = 1 + 2 * ceilf(2.5f * sigma);
    center = (*windowsize) / 2;
 
    if(VERBOSE) printf("      The kernel has %d elements.\n", *windowsize);
-   if((*kernel = (float *) calloc((*windowsize), sizeof(float))) == NULL){
+   if((*kernel = (float *) malloc((*windowsize)*sizeof(float))) == NULL){
       fprintf(stderr, "Error callocing the gaussian kernel array.\n");
       exit(1);
    }
 
    for(i=0;i<(*windowsize);i++){
-      x = (float)(i - center);
-      fx = pow(2.71828, -0.5*x*x/(sigma*sigma)) / (sigma * sqrt(6.2831853));
+      const float x = (float)(i - center);
+      const float fx = powf(2.71828f, -0.5f*x*x/(sigma*sigma)) / (sigma * sqrtf(6.2831853f));
       (*kernel)[i] = fx;
       sum += fx;
    }
@@ -553,19 +614,16 @@ void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
 * NAME: Mike Heath
 * DATE: 2/15/96
 *******************************************************************************/
-void follow_edges(unsigned char *edgemapptr, short *edgemagptr, short lowval,
+void follow_edges(unsigned char * restrict edgemapptr, const short * restrict edgemagptr, short lowval,
    int cols)
 {
-   short *tempmagptr;
-   unsigned char *tempmapptr;
    int i;
-   float thethresh;
-   int x[8] = {1,1,0,-1,-1,-1,0,1},
-       y[8] = {0,1,1,1,0,-1,-1,-1};
+   const int x[8] = {-1,  0,  1, -1,  1, -1, 0, 1 },
+             y[8] = {-1, -1, -1,  0,  0,  1, 1, 1 };
 
    for(i=0;i<8;i++){
-      tempmapptr = edgemapptr - y[i]*cols + x[i];
-      tempmagptr = edgemagptr - y[i]*cols + x[i];
+      unsigned char *tempmapptr = edgemapptr - y[i]*cols + x[i];
+      const short *tempmagptr = edgemagptr - y[i]*cols + x[i];
 
       if((*tempmapptr == POSSIBLE_EDGE) && (*tempmagptr > lowval)){
          *tempmapptr = (unsigned char) EDGE;
@@ -582,12 +640,11 @@ void follow_edges(unsigned char *edgemapptr, short *edgemagptr, short lowval,
 * NAME: Mike Heath
 * DATE: 2/15/96
 *******************************************************************************/
-void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
+void apply_hysteresis(const short int *mag, const unsigned char *nms, int rows, int cols,
 	float tlow, float thigh, unsigned char *edge)
 {
-   int r, c, pos, numedges, lowcount, highcount, lowthreshold, highthreshold,
-       i, hist[32768], rr, cc;
-   short int maximum_mag, sumpix;
+   int r, c, pos, numedges, highcount, lowthreshold, highthreshold, hist[32768] = {0};
+   short int maximum_mag;
 
    /****************************************************************************
    * Initialize the edge map to possible edges everywhere the non-maximal
@@ -596,40 +653,39 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
    * follow_edges algorithm more efficient to not worry about tracking an
    * edge off the side of the image.
    ****************************************************************************/
-   for(r=0,pos=0;r<rows;r++){
-      for(c=0;c<cols;c++,pos++){
-	 if(nms[pos] == POSSIBLE_EDGE) edge[pos] = POSSIBLE_EDGE;
-	 else edge[pos] = NOEDGE;
-      }
-   }
-
-   for(r=0,pos=0;r<rows;r++,pos+=cols){
-      edge[pos] = NOEDGE;
-      edge[pos+cols-1] = NOEDGE;
-   }
-   pos = (rows-1) * cols;
-   for(c=0;c<cols;c++,pos++){
-      edge[c] = NOEDGE;
-      edge[pos] = NOEDGE;
-   }
 
    /****************************************************************************
    * Compute the histogram of the magnitude image. Then use the histogram to
    * compute hysteresis thresholds.
    ****************************************************************************/
-   for(r=0;r<32768;r++) hist[r] = 0;
-   for(r=0,pos=0;r<rows;r++){
-      for(c=0;c<cols;c++,pos++){
-	 if(edge[pos] == POSSIBLE_EDGE) hist[mag[pos]]++;
+   numedges = 0;
+   maximum_mag = 0;
+   for(pos=0;pos<rows*cols;++pos){
+      if(nms[pos] == POSSIBLE_EDGE){
+         edge[pos] = POSSIBLE_EDGE;
+         hist[mag[pos]]++;
+
+         /* Compute the number of pixels that passed the nonmaximal suppression. */
+         ++numedges;
+         if (mag[pos] > maximum_mag){
+            maximum_mag = mag[pos];
+         }
+      }
+      else{
+         edge[pos] = NOEDGE;
       }
    }
 
-   /****************************************************************************
-   * Compute the number of pixels that passed the nonmaximal suppression.
-   ****************************************************************************/
-   for(r=1,numedges=0;r<32768;r++){
-      if(hist[r] != 0) maximum_mag = r;
-      numedges += hist[r];
+   for(r=0;r<rows;r++){
+      pos = r * cols;
+      edge[pos] = NOEDGE;
+      edge[pos+cols-1] = NOEDGE;
+   }
+
+   pos = (rows-1) * cols;
+   for(c=0;c<cols;c++){
+      edge[c] = NOEDGE;
+      edge[pos + c] = NOEDGE;
    }
 
    highcount = (int)(numedges * thigh + 0.5);
@@ -664,20 +720,18 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
    * This loop looks for pixels above the highthreshold to locate edges and
    * then calls follow_edges to continue the edge.
    ****************************************************************************/
-   for(r=0,pos=0;r<rows;r++){
-      for(c=0;c<cols;c++,pos++){
-	 if((edge[pos] == POSSIBLE_EDGE) && (mag[pos] >= highthreshold)){
-            edge[pos] = EDGE;
-            follow_edges((edge+pos), (mag+pos), lowthreshold, cols);
-	 }
+   for(pos=0;pos<rows*cols;++pos){
+      if((edge[pos] == POSSIBLE_EDGE) && (mag[pos] >= highthreshold)){
+         edge[pos] = EDGE;
+         follow_edges((edge+pos), (mag+pos), lowthreshold, cols);
       }
    }
 
    /****************************************************************************
    * Set all the remaining possible edges to non-edges.
    ****************************************************************************/
-   for(r=0,pos=0;r<rows;r++){
-      for(c=0;c<cols;c++,pos++) if(edge[pos] != EDGE) edge[pos] = NOEDGE;
+   for(pos=0;pos<rows*cols;++pos){
+      if(edge[pos] != EDGE) edge[pos] = NOEDGE;
    }
 }
 
@@ -688,70 +742,50 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
 * NAME: Mike Heath
 * DATE: 2/15/96
 *******************************************************************************/
-void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
-    unsigned char *result) 
+void non_max_supp(const short * restrict mag, const short * restrict gradx, const short * restrict grady, int nrows, int ncols,
+    unsigned char * restrict result)
 {
-    int rowcount, colcount,count;
-    short *magrowptr,*magptr;
-    short *gxrowptr,*gxptr;
-    short *gyrowptr,*gyptr,z1,z2;
-    short m00,gx,gy;
-    float mag1,mag2,xperp,yperp;
-    unsigned char *resultrowptr, *resultptr;
-    
-
-   /****************************************************************************
-   * Zero the edges of the result image.
-   ****************************************************************************/
-    for(count=0,resultrowptr=result,resultptr=result+ncols*(nrows-1); 
-        count<ncols; resultptr++,resultrowptr++,count++){
-        *resultrowptr = *resultptr = (unsigned char) 0;
-    }
-
-    for(count=0,resultptr=result,resultrowptr=result+ncols-1;
-        count<nrows; count++,resultptr+=ncols,resultrowptr+=ncols){
-        *resultptr = *resultrowptr = (unsigned char) 0;
-    }
-
    /****************************************************************************
    * Suppress non-maximum points.
    ****************************************************************************/
-   for(rowcount=1,magrowptr=mag+ncols+1,gxrowptr=gradx+ncols+1,
-      gyrowptr=grady+ncols+1,resultrowptr=result+ncols+1;
-      rowcount<nrows-2; 
-      rowcount++,magrowptr+=ncols,gyrowptr+=ncols,gxrowptr+=ncols,
-      resultrowptr+=ncols){   
-      for(colcount=1,magptr=magrowptr,gxptr=gxrowptr,gyptr=gyrowptr,
-         resultptr=resultrowptr;colcount<ncols-2; 
-         colcount++,magptr++,gxptr++,gyptr++,resultptr++){   
-         m00 = *magptr;
+   for(int rowcount=1; rowcount < nrows - 2; ++rowcount){
+      for(int colcount=1; colcount < ncols - 2; ++colcount){
+         const int pos = rowcount * ncols + colcount;
+         const short* magptr = mag + pos;
+         unsigned char *resultptr = result + pos;
+         const short m00 = *magptr;
          if(m00 == 0){
             *resultptr = (unsigned char) NOEDGE;
          }
          else{
-            xperp = -(gx = *gxptr)/((float)m00);
-            yperp = (gy = *gyptr)/((float)m00);
-         }
+            const short *gxptr = gradx + pos;
+            const short *gyptr = grady + pos;
+            const short gx = *(gxptr);
+            const short gy = *(gyptr);
+            const float xperp = -gx/((float)m00);
+            const float yperp = gy/((float)m00);
+            float mag1,mag2;
+            short z1,z2,z3,z4;
 
-         if(gx >= 0){
-            if(gy >= 0){
+            if(gx >= 0){
+               if(gy >= 0){
                     if (gx >= gy)
-                    {  
+                    {
                         /* 111 */
                         /* Left point */
                         z1 = *(magptr - 1);
                         z2 = *(magptr - ncols - 1);
 
                         mag1 = (m00 - z1)*xperp + (z2 - z1)*yperp;
-                        
-                        /* Right point */
-                        z1 = *(magptr + 1);
-                        z2 = *(magptr + ncols + 1);
 
-                        mag2 = (m00 - z1)*xperp + (z2 - z1)*yperp;
+                        /* Right point */
+                        z3 = *(magptr + 1);
+                        z4 = *(magptr + ncols + 1);
+
+                        mag2 = (m00 - z3)*xperp + (z4 - z3)*yperp;
                     }
                     else
-                    {    
+                    {
                         /* 110 */
                         /* Left point */
                         z1 = *(magptr - ncols);
@@ -760,10 +794,10 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         mag1 = (z1 - z2)*xperp + (z1 - m00)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr + ncols);
-                        z2 = *(magptr + ncols + 1);
+                        z3 = *(magptr + ncols);
+                        z4 = *(magptr + ncols + 1);
 
-                        mag2 = (z1 - z2)*xperp + (z1 - m00)*yperp; 
+                        mag2 = (z3 - z4)*xperp + (z3 - m00)*yperp;
                     }
                 }
                 else
@@ -776,15 +810,15 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         z2 = *(magptr + ncols - 1);
 
                         mag1 = (m00 - z1)*xperp + (z1 - z2)*yperp;
-            
-                        /* Right point */
-                        z1 = *(magptr + 1);
-                        z2 = *(magptr - ncols + 1);
 
-                        mag2 = (m00 - z1)*xperp + (z1 - z2)*yperp;
+                        /* Right point */
+                        z3 = *(magptr + 1);
+                        z4 = *(magptr - ncols + 1);
+
+                        mag2 = (m00 - z3)*xperp + (z3 - z4)*yperp;
                     }
                     else
-                    {    
+                    {
                         /* 100 */
                         /* Left point */
                         z1 = *(magptr + ncols);
@@ -793,19 +827,19 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         mag1 = (z1 - z2)*xperp + (m00 - z1)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr - ncols);
-                        z2 = *(magptr - ncols + 1);
+                        z3 = *(magptr - ncols);
+                        z4 = *(magptr - ncols + 1);
 
-                        mag2 = (z1 - z2)*xperp  + (m00 - z1)*yperp; 
+                        mag2 = (z3 - z4)*xperp  + (m00 - z3)*yperp;
                     }
                 }
             }
             else
             {
-                if ((gy = *gyptr) >= 0)
+                if (gy >= 0)
                 {
                     if (-gx >= gy)
-                    {          
+                    {
                         /* 011 */
                         /* Left point */
                         z1 = *(magptr + 1);
@@ -814,10 +848,10 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         mag1 = (z1 - m00)*xperp + (z2 - z1)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr - 1);
-                        z2 = *(magptr + ncols - 1);
+                        z3 = *(magptr - 1);
+                        z4 = *(magptr + ncols - 1);
 
-                        mag2 = (z1 - m00)*xperp + (z2 - z1)*yperp;
+                        mag2 = (z3 - m00)*xperp + (z4 - z3)*yperp;
                     }
                     else
                     {
@@ -829,10 +863,10 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         mag1 = (z2 - z1)*xperp + (z1 - m00)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr + ncols);
-                        z2 = *(magptr + ncols - 1);
+                        z3 = *(magptr + ncols);
+                        z4 = *(magptr + ncols - 1);
 
-                        mag2 = (z2 - z1)*xperp + (z1 - m00)*yperp;
+                        mag2 = (z4 - z3)*xperp + (z3 - m00)*yperp;
                     }
                 }
                 else
@@ -847,10 +881,10 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         mag1 = (z1 - m00)*xperp + (z1 - z2)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr - 1);
-                        z2 = *(magptr - ncols - 1);
+                        z3 = *(magptr - 1);
+                        z4 = *(magptr - ncols - 1);
 
-                        mag2 = (z1 - m00)*xperp + (z1 - z2)*yperp;
+                        mag2 = (z3 - m00)*xperp + (z3 - z4)*yperp;
                     }
                     else
                     {
@@ -862,28 +896,26 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
                         mag1 = (z2 - z1)*xperp + (m00 - z1)*yperp;
 
                         /* Right point */
-                        z1 = *(magptr - ncols);
-                        z2 = *(magptr - ncols - 1);
+                        z3 = *(magptr - ncols);
+                        z4 = *(magptr - ncols - 1);
 
-                        mag2 = (z2 - z1)*xperp + (m00 - z1)*yperp;
+                        mag2 = (z4 - z3)*xperp + (m00 - z3)*yperp;
                     }
                 }
-            } 
+            }
 
             /* Now determine if the current point is a maximum point */
 
-            if ((mag1 > 0.0) || (mag2 > 0.0))
+            if ((mag1 > 0.0) || (mag2 >= 0.0))
             {
                 *resultptr = (unsigned char) NOEDGE;
             }
             else
-            {    
-                if (mag2 == 0.0)
-                    *resultptr = (unsigned char) NOEDGE;
-                else
-                    *resultptr = (unsigned char) POSSIBLE_EDGE;
+            {
+               *resultptr = (unsigned char) POSSIBLE_EDGE;
             }
-        } 
+         }
+      }
     }
 }
 /*******************************************************************************
@@ -1030,7 +1062,7 @@ int write_pgm_image(char *outfilename, unsigned char *image, int rows,
 * All comments in the header are discarded in the process of reading the
 * image. Upon failure, this function returns 0, upon sucess it returns 1.
 ******************************************************************************/
-int read_ppm_image(char *infilename, unsigned char **image_red, 
+int read_ppm_image(char *infilename, unsigned char **image_red,
     unsigned char **image_grn, unsigned char **image_blu, int *rows,
     int *cols)
 {
